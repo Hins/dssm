@@ -12,6 +12,7 @@ flags.DEFINE_string('file_path', '~/dssm/data/wb.dat', 'sample files')
 flags.DEFINE_float('train_set_ratio', 0.7, 'train set ratio')
 flags.DEFINE_string('summaries_dir', '~/dssm/data/dssm-400-120-relu', 'Summaries directory')
 flags.DEFINE_float('learning_rate', 0.1, 'Initial learning rate.')
+flags.DEFINE_integer('negative_size', 20, 'negative size')
 flags.DEFINE_integer('max_steps', 900000, 'Number of steps to run trainer.')
 flags.DEFINE_integer('epoch_steps', 18000, "Number of steps in one epoch.")
 flags.DEFINE_integer('pack_size', 2000, "Number of batches in one pickle pack.")
@@ -40,11 +41,18 @@ def load_samples(file_path):
     target_samples = []
     labels = []
     input_file = open(file_path, 'r')
-    for line in input_file:    # <sentence1>\001<sentence2>\t<label>
+    for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
         line = line.replace('\n', '').replace('\r', '')
-        elements = line.split('\t')
+        elements = line.split('\001')
         if len(elements) < 2:
             continue
+        user_query = elements[0]
+        documents = elements[1].split('\002')
+
+        document_dict = {}
+        for document in documents:
+            sub_elements = document.split('\t')
+            document_dict[sub_elements[0]] = int(sub_elements[1])
 
         sentence1 = elements[0].split("\001")[0]
         sentence2 = elements[0].split("\001")[1]
@@ -130,7 +138,6 @@ L2_N = 120
 query_in_shape = np.array([BS, TRIGRAM_D], np.int64)
 doc_in_shape = np.array([BS, TRIGRAM_D], np.int64)
 
-
 def variable_summaries(var, name):
     """Attach a lot of summaries to a Tensor."""
     with tf.name_scope('summaries'):
@@ -147,8 +154,10 @@ def variable_summaries(var, name):
 with tf.name_scope('input'):
     # Shape [BS, TRIGRAM_D].
     query_batch = tf.sparse_placeholder(tf.float32, shape=query_in_shape, name='QueryBatch')
+    print("query_batch shape is %s" % query_batch.get_shape())    # [1000, 49284]
     # Shape [BS, TRIGRAM_D]
     doc_batch = tf.sparse_placeholder(tf.float32, shape=doc_in_shape, name='DocBatch')
+    print("doc_batch shape is %s" % doc_batch.get_shape())    # [1000, 49284]
 
 with tf.name_scope('L1'):
     l1_par_range = np.sqrt(6.0 / (TRIGRAM_D + L1_N))
@@ -163,7 +172,9 @@ with tf.name_scope('L1'):
     doc_l1 = tf.sparse_tensor_dense_matmul(doc_batch, weight1) + bias1
 
     query_l1_out = tf.nn.relu(query_l1)
+    print("query_l1_out shape is %s" % query_l1_out.get_shape())    # [1000, 400]
     doc_l1_out = tf.nn.relu(doc_l1)
+    print("doc_l1_out shape is %s" % doc_l1_out.get_shape())    # [1000, 400]
 
 with tf.name_scope('L2'):
     l2_par_range = np.sqrt(6.0 / (L1_N + L2_N))
@@ -174,9 +185,13 @@ with tf.name_scope('L2'):
     variable_summaries(bias2, 'L2_biases')
 
     query_l2 = tf.matmul(query_l1_out, weight2) + bias2
+    print("query_l2 shape is %s" % query_l2.get_shape())    # [1000, 120]
     doc_l2 = tf.matmul(doc_l1_out, weight2) + bias2
+    print("doc_l2 shape is %s" % doc_l2.get_shape())    # [1000, 120]
     query_y = tf.nn.relu(query_l2)
+    print("query_y shape is %s" % query_y.get_shape())    # [1000, 120]
     doc_y = tf.nn.relu(doc_l2)
+    print("doc_y shape is %s" % doc_y.get_shape())    # [1000, 120]
 
 '''
 with tf.name_scope('FD_rotate'):
@@ -193,14 +208,15 @@ with tf.name_scope('FD_rotate'):
 
 with tf.name_scope('Cosine_Similarity'):
     # Cosine similarity
-    query_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True)), [NEG + 1, 1])
+    #query_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True)), [NEG + 1, 1])    # [51000, 1]
+    query_norm = tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True))
     doc_norm = tf.sqrt(tf.reduce_sum(tf.square(doc_y), 1, True))
 
     prod = tf.reduce_sum(tf.multiply(tf.tile(query_y, [NEG + 1, 1]), doc_y), 1, True)
     norm_prod = tf.multiply(query_norm, doc_norm)
 
     cos_sim_raw = tf.truediv(prod, norm_prod)
-    cos_sim = tf.transpose(tf.reshape(tf.transpose(cos_sim_raw), [NEG + 1, BS])) * 20
+    cos_sim = tf.transpose(tf.reshape(tf.transpose(cos_sim_raw), [NEG + 1, BS])) * 20    # 20 is \gamma
 
 with tf.name_scope('Loss'):
     # Train Loss
