@@ -8,7 +8,9 @@ import tensorflow as tf
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('summaries_dir', '/tmp/dssm-400-120-relu', 'Summaries directory')
+flags.DEFINE_string('file_path', '~/dssm/data/wb.dat', 'sample files')
+flags.DEFINE_float('train_set_ratio', 0.7, 'train set ratio')
+flags.DEFINE_string('summaries_dir', '~/dssm/data/dssm-400-120-relu', 'Summaries directory')
 flags.DEFINE_float('learning_rate', 0.1, 'Initial learning rate.')
 flags.DEFINE_integer('max_steps', 900000, 'Number of steps to run trainer.')
 flags.DEFINE_integer('epoch_steps', 18000, "Number of steps in one epoch.")
@@ -17,14 +19,95 @@ flags.DEFINE_bool('gpu', 1, "Enable GPU or not")
 
 start = time.time()
 
+'''
 doc_train_data = None
 query_train_data = None
 
 # load test data for now
 query_test_data = pickle.load(open('../data/query.test.1.pickle', 'rb')).tocsr()
 doc_test_data = pickle.load(open('../data/doc.test.1.pickle', 'rb')).tocsr()
+'''
 
-def load_train_data(pack_idx):
+placeholder = "none_xtpan"
+separator = "###"
+trigram_dict = {}
+
+TRIGRAM_D = 49284
+
+def load_samples(file_path):
+    global TRIGRAM_D
+    source_samples = []
+    target_samples = []
+    labels = []
+    input_file = open(file_path, 'r')
+    for line in input_file:    # <sentence1>\001<sentence2>\t<label>
+        line = line.replace('\n', '').replace('\r', '')
+        elements = line.split('\t')
+        if len(elements) < 2:
+            continue
+
+        sentence1 = elements[0].split("\001")[0]
+        sentence2 = elements[0].split("\001")[1]
+        label = elements[1]
+        labels.append(int(label))
+        sent1_words = sentence1.split(',')
+        sent1_len = len(sent1_words)
+        sent2_words = sentence2.split(',')
+        sent2_len = len(sent2_words)
+        word_index_list = []
+        for index,word in enumerate(sent1_words):
+            if index + 2 < sent1_len:
+                key = word + separator + sent1_words[index + 1] + separator + sent1_words[index + 2]
+                if key not in trigram_dict:
+                    trigram_dict[key] = len(trigram_dict) + 1
+                word_index_list.append(trigram_dict[key])
+            elif index + 2 >= sent1_len:
+                key = word + separator + sent1_words[index+1] + separator + placeholder
+                if key not in trigram_dict:
+                    trigram_dict[key] = len(trigram_dict) + 1
+                word_index_list.append(trigram_dict[key])
+            elif index + 1 >= sent1_len:
+                key = word+separator+placeholder+separator+placeholder
+                if key not in trigram_dict:
+                    trigram_dict[key] = len(trigram_dict) + 1
+                word_index_list.append(trigram_dict[key])
+        source_samples.append(word_index_list)
+        word_index_list = []
+        for index,word in enumerate(sent2_words):
+            if index + 2 < sent2_len:
+                key = word + separator + sent2_words[index + 1] + separator + sent2_words[index + 2]
+                if key not in trigram_dict:
+                    trigram_dict[key] = len(trigram_dict) + 1
+                word_index_list.append(trigram_dict[key])
+            elif index + 2 >= sent2_len:
+                key = word + separator + sent2_words[index+1] + separator + placeholder
+                if key not in trigram_dict:
+                    trigram_dict[key] = len(trigram_dict) + 1
+                word_index_list.append(trigram_dict[key])
+            elif index + 1 >= sent1_len:
+                key = word+separator+placeholder+separator+placeholder
+                if key not in trigram_dict:
+                    trigram_dict[key] = len(trigram_dict) + 1
+                word_index_list.append(trigram_dict[key])
+        target_samples.append(word_index_list)
+    input_file.close()
+    TRIGRAM_D = len(trigram_dict) + 1
+    for i in xrange(len(source_samples)):
+        tmp = [0] * TRIGRAM_D
+        for item in source_samples[i]:
+            tmp[item] = 1
+        source_samples[i] = tmp
+    for i in xrange(len(target_samples)):
+        tmp = [0] * TRIGRAM_D
+        for item in target_samples[i]:
+            tmp[item] = 1
+        target_samples[i] = tmp
+
+    return (source_samples, target_samples, TRIGRAM_D)
+
+'''
+def load_train_data(path):
+    # return load_samples(path)
     global doc_train_data, query_train_data
     doc_train_data = None
     query_train_data = None
@@ -33,11 +116,10 @@ def load_train_data(pack_idx):
     query_train_data = pickle.load(open('../data/query.train.'+ str(pack_idx)+ '.pickle', 'rb')).tocsr()
     end = time.time()
     print ("\nTrain data %d/9 is loaded in %.2fs" % (pack_idx, end - start))
+'''
 
 end = time.time()
 print("Loading data from HDD to memory: %.2fs" % (end - start))
-
-TRIGRAM_D = 49284
 
 NEG = 50
 BS = 1000
@@ -96,6 +178,7 @@ with tf.name_scope('L2'):
     query_y = tf.nn.relu(query_l2)
     doc_y = tf.nn.relu(doc_l2)
 
+'''
 with tf.name_scope('FD_rotate'):
     # Rotate FD+ to produce 50 FD-
     temp = tf.tile(doc_y, [1, 1])
@@ -106,6 +189,7 @@ with tf.name_scope('FD_rotate'):
                           [doc_y,
                            tf.slice(temp, [rand, 0], [BS - rand, -1]),
                            tf.slice(temp, [0, 0], [rand, -1])])
+'''
 
 with tf.name_scope('Cosine_Similarity'):
     # Cosine similarity
@@ -165,12 +249,12 @@ def pull_batch(query_data, doc_data, batch_idx):
     return query_in, doc_in
 
 
-def feed_dict(Train, batch_idx):
+def feed_dict(Train, query_data, doc_data, batch_idx):
     """Make a TensorFlow feed_dict: maps data onto Tensor placeholders."""
     if Train:
-        query_in, doc_in = pull_batch(query_train_data, doc_train_data, batch_idx)
+        query_in, doc_in = pull_batch(query_data, doc_data, batch_idx)
     else:
-        query_in, doc_in = pull_batch(query_test_data, doc_test_data, batch_idx)
+        query_in, doc_in = pull_batch(query_data, doc_data, batch_idx)
     return {query_batch: query_in, doc_batch: doc_in}
 
 
@@ -181,17 +265,26 @@ config.gpu_options.allow_growth = True
 
 with tf.Session(config=config) as sess:
     sess.run(tf.initialize_all_variables())
-    train_writer = tf.train.SummaryWriter(FLAGS.summaries_dir + '/train', sess.graph)
-    test_writer = tf.train.SummaryWriter(FLAGS.summaries_dir + '/test', sess.graph)
+    train_writer = tf.train.SummaryWriter(FLAGS.summaries_dir + '~/dssm/data/train', sess.graph)
+    test_writer = tf.train.SummaryWriter(FLAGS.summaries_dir + '~/dssm/data/test', sess.graph)
 
     # Actual execution
     start = time.time()
     # fp_time = 0
     # fbp_time = 0
+
+    (query_samples, doc_samples, trigram_dict_size) = load_samples(FLAGS.file_path)
+    sample_size = len(query_samples)
+    train_set_size = int(sample_size / BS * FLAGS.train_set_ratio) * BS
+    query_train = query_samples[0:train_set_size,]
+    doc_train = doc_samples[0:train_set_size,]
+    query_test = query_samples[train_set_size:,]
+    doc_test = doc_samples[train_set_size:,]
+
     for step in range(FLAGS.max_steps):
         batch_idx = step % FLAGS.epoch_steps
-        if batch_idx % FLAGS.pack_size == 0:
-            load_train_data(batch_idx / FLAGS.pack_size + 1)
+        #if batch_idx % FLAGS.pack_size == 0:
+        #    load_train_data(batch_idx / FLAGS.pack_size + 1)
 
             # # setup toolbar
             # sys.stdout.write("[%s]" % (" " * toolbar_width))
@@ -210,7 +303,7 @@ with tf.Session(config=config) as sess:
         # fp_time += t2 - t1
         # #print(t2-t1)
         # t1 = time.time()
-        sess.run(train_step, feed_dict=feed_dict(True, batch_idx % FLAGS.pack_size))
+        sess.run(train_step, feed_dict=feed_dict(True, query_train, doc_train, batch_idx % FLAGS.pack_size))
         # t2 = time.time()
         # fbp_time += t2 - t1
         # #print(t2 - t1)
@@ -223,7 +316,7 @@ with tf.Session(config=config) as sess:
             end = time.time()
             epoch_loss = 0
             for i in range(FLAGS.pack_size):
-                loss_v = sess.run(loss, feed_dict=feed_dict(True, i))
+                loss_v = sess.run(loss, feed_dict=feed_dict(True, query_train, doc_train, i))
                 epoch_loss += loss_v
 
             epoch_loss /= FLAGS.pack_size
@@ -238,7 +331,7 @@ with tf.Session(config=config) as sess:
 
             epoch_loss = 0
             for i in range(FLAGS.pack_size):
-                loss_v = sess.run(loss, feed_dict=feed_dict(False, i))
+                loss_v = sess.run(loss, feed_dict=feed_dict(False, query_test, doc_test, i))
                 epoch_loss += loss_v
 
             epoch_loss /= FLAGS.pack_size
