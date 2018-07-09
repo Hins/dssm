@@ -135,13 +135,13 @@ def variable_summaries(var, name):
     """Attach a lot of summaries to a Tensor."""
     with tf.name_scope('summaries'):
         mean = tf.reduce_mean(var)
-        tf.scalar_summary('mean/' + name, mean)
+        tf.summary.scalar('mean/' + name, mean)
         with tf.name_scope('stddev'):
             stddev = tf.sqrt(tf.reduce_sum(tf.square(var - mean)))
-        tf.scalar_summary('sttdev/' + name, stddev)
-        tf.scalar_summary('max/' + name, tf.reduce_max(var))
-        tf.scalar_summary('min/' + name, tf.reduce_min(var))
-        tf.histogram_summary(name, var)
+        tf.summary.scalar('sttdev/' + name, stddev)
+        tf.summary.scalar('max/' + name, tf.reduce_max(var))
+        tf.summary.scalar('min/' + name, tf.reduce_min(var))
+        tf.summary.histogram(name, var)
 
 
 with tf.name_scope('input'):
@@ -196,8 +196,8 @@ with tf.name_scope('Cosine_Similarity'):
     query_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True)), [NEG + 1, 1])
     doc_norm = tf.sqrt(tf.reduce_sum(tf.square(doc_y), 1, True))
 
-    prod = tf.reduce_sum(tf.mul(tf.tile(query_y, [NEG + 1, 1]), doc_y), 1, True)
-    norm_prod = tf.mul(query_norm, doc_norm)
+    prod = tf.reduce_sum(tf.multiply(tf.tile(query_y, [NEG + 1, 1]), doc_y), 1, True)
+    norm_prod = tf.multiply(query_norm, doc_norm)
 
     cos_sim_raw = tf.truediv(prod, norm_prod)
     cos_sim = tf.transpose(tf.reshape(tf.transpose(cos_sim_raw), [NEG + 1, BS])) * 20
@@ -207,7 +207,7 @@ with tf.name_scope('Loss'):
     prob = tf.nn.softmax((cos_sim))
     hit_prob = tf.slice(prob, [0, 0], [-1, 1])
     loss = -tf.reduce_sum(tf.log(hit_prob)) / BS
-    tf.scalar_summary('loss', loss)
+    tf.summary.scalar('loss', loss)
 
 with tf.name_scope('Training'):
     # Optimizer
@@ -222,7 +222,7 @@ merged = tf.merge_all_summaries()
 
 with tf.name_scope('Test'):
     average_loss = tf.placeholder(tf.float32)
-    loss_summary = tf.scalar_summary('average_loss', average_loss)
+    loss_summary = tf.summary.scalar('average_loss', average_loss)
 
 
 def pull_batch(query_data, doc_data, batch_idx):
