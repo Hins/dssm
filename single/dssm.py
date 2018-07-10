@@ -31,92 +31,143 @@ doc_test_data = pickle.load(open('../data/doc.test.1.pickle', 'rb')).tocsr()
 
 placeholder = "none_xtpan"
 separator = "###"
-trigram_dict = {}
+bigram_dict = {}
+bigram_count = {}
 
-TRIGRAM_D = 49284
+BIGRAM_D = 49284
 
-def load_samples(file_path):
-    global TRIGRAM_D
-    source_samples = []
-    target_samples = []
-    labels = []
-    input_file = open(file_path, 'r')
-    for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
-        line = line.replace('\n', '').replace('\r', '')
-        elements = line.split('\001')
-        if len(elements) < 2:
-            continue
-        user_query_list = elements[0].split(",")
-        user_query_len = len(user_query_list)
-        word_index_list = []
-        for index,word in enumerate(user_query_list):
-            if index + 2 < user_query_len:
-                key = word + separator + user_query_list[index + 1] + separator + user_query_list[index + 2]
-                if key not in trigram_dict:
-                    trigram_dict[key] = len(trigram_dict) + 1
-                word_index_list.append(trigram_dict[key])
-            elif index + 2 >= user_query_len:
-                key = word + separator + user_query_list[index+1] + separator + placeholder
-                if key not in trigram_dict:
-                    trigram_dict[key] = len(trigram_dict) + 1
-                word_index_list.append(trigram_dict[key])
-            elif index + 1 >= user_query_len:
-                key = word + separator + placeholder + separator + placeholder
-                if key not in trigram_dict:
-                    trigram_dict[key] = len(trigram_dict) + 1
-                word_index_list.append(trigram_dict[key])
-        source_samples.append(word_index_list)
+#def load_samples(file_path):
+#global TRIGRAM_D
 
-        documents = elements[1].split('\002')
-        document_dict = {}
-        for document in documents:
-            sub_elements = document.split('\t')
-            document = sub_elements[0].split(",")
-            document_len = len(document)
-            label = sub_elements[1]
+'''
+source_samples = []
+target_samples = []
+input_file = open('/root/dssm/data/wb.dat', 'r')
 
-            total_list = []
-            word_index_list = []
-            for index, word in enumerate(document):
-                if index + 2 < document_len:
-                    key = word + separator + document[index + 1] + separator + document[index + 2]
-                    if key not in trigram_dict:
-                        trigram_dict[key] = len(trigram_dict) + 1
-                    word_index_list.append(trigram_dict[key])
-                elif index + 2 >= document_len:
-                    key = word + separator + document[index + 1] + separator + placeholder
-                    if key not in trigram_dict:
-                        trigram_dict[key] = len(trigram_dict) + 1
-                    word_index_list.append(trigram_dict[key])
-                elif index + 1 >= document_len:
-                    key = word + separator + placeholder + separator + placeholder
-                    if key not in trigram_dict:
-                        trigram_dict[key] = len(trigram_dict) + 1
-                    word_index_list.append(trigram_dict[key])
-            if label == "1":
-                total_list = [word_index_list] + total_list
+# calculate trigram count
+for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
+    line = line.replace('\n', '').replace('\r', '')
+    elements = line.split('\001')
+    if len(elements) < 2:
+        continue
+    user_query_list = elements[0].split(",")
+    user_query_len = len(user_query_list)
+    word_index_list = []
+    for index,word in enumerate(user_query_list):
+        if index + 1 < user_query_len:
+            key = word + separator + user_query_list[index + 1]
+            if key not in bigram_count:
+                bigram_count[key] = 1
             else:
-                total_list.append(word_index_list)
-        target_samples.append(total_list)
-    input_file.close()
+                bigram_count[key] += 1
+        else:
+            key = word + separator + placeholder
+            if key not in bigram_count:
+                bigram_count[key] = 1
+            else:
+                bigram_count[key] += 1
 
-    print("trigram_dict length is %d" % len(trigram_dict))
-    TRIGRAM_D = len(trigram_dict) + 1
-    for i in xrange(len(source_samples)):
-        tmp = [0] * TRIGRAM_D
-        for item in source_samples[i]:
-            tmp[item] = 1
-        source_samples[i] = tmp
-    for i in xrange(len(target_samples)):
-        new_list = []
-        for j in xrange(len(target_samples[i])):
-            tmp = [0] * TRIGRAM_D
-            for item in target_samples[i][j]:
-                tmp[item] = 1
-            new_list.append(tmp)
-        target_samples[i] = new_list
+    documents = elements[1].split('\002')
+    document_dict = {}
+    for document in documents:
+        sub_elements = document.split('\t')
+        document = sub_elements[0].split(",")
+        document_len = len(document)
 
-    return (source_samples, target_samples, TRIGRAM_D)
+        for index, word in enumerate(document):
+            if index + 1 < document_len:
+                key = word + separator + document[index + 1]
+                if key not in bigram_count:
+                    bigram_count[key] = 1
+                else:
+                    bigram_count[key] += 1
+            else:
+                key = word + separator + placeholder
+                if key not in bigram_count:
+                    bigram_count[key] = 1
+                else:
+                    bigram_count[key] += 1
+input_file.seek(0)
+
+print("calculate bigram count complete")
+
+for line_count, line in enumerate(input_file):    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
+    line = line.replace('\n', '').replace('\r', '')
+    elements = line.split('\001')
+    if len(elements) < 2:
+        continue
+    user_query_list = elements[0].split(",")
+    user_query_len = len(user_query_list)
+    word_index_list = []
+    for index,word in enumerate(user_query_list):
+        if index + 1 < user_query_len:
+            key = word + separator + user_query_list[index + 1]
+            #if bigram_count[key] > 5:
+            if key not in bigram_dict:
+                bigram_dict[key] = len(bigram_dict) + 1
+            word_index_list.append(bigram_dict[key])
+        else:
+            key = word + separator + placeholder
+            #if trigram_count[key] > 5:
+            if key not in bigram_dict:
+                bigram_dict[key] = len(bigram_dict) + 1
+            word_index_list.append(bigram_dict[key])
+    if len(word_index_list) == 0:
+        continue
+    source_samples.append(word_index_list)
+
+    documents = elements[1].split('\002')
+    document_dict = {}
+    for document in documents:
+        sub_elements = document.split('\t')
+        document = sub_elements[0].split(",")
+        document_len = len(document)
+        label = sub_elements[1]
+
+        total_list = []
+        word_index_list = []
+        for index, word in enumerate(document):
+            if index + 2 < document_len:
+                key = word + separator + document[index + 1] + separator + document[index + 2]
+                # if trigram_count[key] > 5:
+                if key not in bigram_dict:
+                    bigram_dict[key] = len(bigram_dict) + 1
+                word_index_list.append(bigram_dict[key])
+            else:
+                key = word + separator + placeholder
+                #if trigram_count[key] > 5:
+                if key not in bigram_dict:
+                    bigram_dict[key] = len(bigram_dict) + 1
+                word_index_list.append(bigram_dict[key])
+        if len(word_index_list) == 0:
+            continue
+        if label == "1":
+            total_list = [word_index_list] + total_list
+        else:
+            total_list.append(word_index_list)
+    target_samples.append(total_list)
+input_file.close()
+
+print("bigram_dict length is %d" % len(bigram_dict))
+BIGRAM_D = len(bigram_dict) + 1
+
+user_query_dat = np.zeros(shape=[line_count+1, BIGRAM_D])
+document_dat = np.zeros(shape=[line_count+1, FLAGS.negative_size * BIGRAM_D])    # flat document one-hot data
+
+for i in xrange(len(source_samples)):
+    for item in source_samples[i]:
+        if item > user_query_dat.shape[1]:
+            print(item)
+        user_query_dat[i][item] = 1
+print('source_samples load complete')
+for i in xrange(len(target_samples)):
+    for j in xrange(len(target_samples[i])):
+        for k in target_samples[i][j]:
+            document_dat[i][j*BIGRAM_D+k] = 1
+print('target_samples load complete')
+
+    #return (source_samples, target_samples, TRIGRAM_D)
+'''
 
 '''
 def load_train_data(path):
@@ -140,8 +191,8 @@ BS = 1000
 L1_N = 400
 L2_N = 120
 
-query_in_shape = np.array([BS, TRIGRAM_D], np.int64)
-doc_in_shape = np.array([BS, FLAGS.negative_size, TRIGRAM_D], np.int64)
+query_in_shape = np.array([BS, BIGRAM_D], np.int64)
+doc_in_shape = np.array([BS, FLAGS.negative_size, BIGRAM_D], np.int64)
 
 def variable_summaries(var, name):
     """Attach a lot of summaries to a Tensor."""
@@ -159,22 +210,29 @@ def variable_summaries(var, name):
 with tf.name_scope('input'):
     # Shape [BS, TRIGRAM_D].
     query_batch = tf.sparse_placeholder(tf.float32, shape=query_in_shape, name='QueryBatch')
-    print("query_batch shape is %s" % query_batch.get_shape())    # [1000, 49284]
+    print("query_batch shape is %s" % query_batch.get_shape())    # [1000, BIGRAM_D]
     # Shape [BS, TRIGRAM_D]
     doc_batch = tf.sparse_placeholder(tf.float32, shape=doc_in_shape, name='DocBatch')
-    print("doc_batch shape is %s" % doc_batch.get_shape())    # [1000, 20, 49284]
+    print("doc_batch shape is %s" % doc_batch.get_shape())    # [1000, 20, BIGRAM_D]
 
 with tf.name_scope('L1'):
-    l1_par_range = np.sqrt(6.0 / (TRIGRAM_D + L1_N))
-    weight1 = tf.Variable(tf.random_uniform([TRIGRAM_D, L1_N], -l1_par_range, l1_par_range))
+    l1_par_range = np.sqrt(6.0 / (BIGRAM_D + L1_N))
+    weight1 = tf.Variable(tf.random_uniform([BIGRAM_D, L1_N], -l1_par_range, l1_par_range))
     bias1 = tf.Variable(tf.random_uniform([L1_N], -l1_par_range, l1_par_range))
     variable_summaries(weight1, 'L1_weights')
     variable_summaries(bias1, 'L1_biases')
 
     # query_l1 = tf.matmul(tf.to_float(query_batch),weight1)+bias1
     query_l1 = tf.sparse_tensor_dense_matmul(query_batch, weight1) + bias1
+    print(type(query_l1))
     # doc_l1 = tf.matmul(tf.to_float(doc_batch),weight1)+bias1
-    doc_l1 = tf.sparse_tensor_dense_matmul(doc_batch, weight1) + bias1
+    doc_batches = tf.sparse_split(sp_input=doc_batch, num_split=FLAGS.negative_size, axis=1)
+    doc_l1_batch = []
+    for doc in doc_batches:
+        doc_l1_batch.append(tf.sparse_tensor_dense_matmul(tf.sparse_reshape(doc, shape=[BS, BIGRAM_D]), weight1) + bias1)
+    doc_l1 = tf.reshape(tf.convert_to_tensor(doc_l1_batch), shape=[BS, FLAGS.negative_size, -1])
+    print("tmp shape is %s" % doc_l1.get_shape())
+    # tf.convert_to_tensor_or_sparse_tensor(tf.squeeze(doc_l1_batch, axis=0))
 
     query_l1_out = tf.nn.relu(query_l1)
     print("query_l1_out shape is %s" % query_l1_out.get_shape())    # [1000, 400]
@@ -201,8 +259,7 @@ with tf.name_scope('L2'):
 with tf.name_scope('Cosine_Similarity'):
     # Cosine similarity
     query_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True)), [NEG + 1, 1])    # [51000, 1]
-    #query_norm = tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True))
-    doc_norm = tf.sqrt(tf.reduce_sum(tf.square(doc_y), 1, True))
+    doc_norm = tf.sqrt(tf.reduce_sum(tf.square(doc_y), 1, True))    # [1000, 1]
 
     prod = tf.reduce_sum(tf.multiply(tf.tile(query_y, [NEG + 1, 1]), doc_y), 1, True)
     norm_prod = tf.multiply(query_norm, doc_norm)
