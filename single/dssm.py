@@ -224,14 +224,13 @@ with tf.name_scope('L1'):
 
     # query_l1 = tf.matmul(tf.to_float(query_batch),weight1)+bias1
     query_l1 = tf.sparse_tensor_dense_matmul(query_batch, weight1) + bias1
-    print(type(query_l1))
     # doc_l1 = tf.matmul(tf.to_float(doc_batch),weight1)+bias1
     doc_batches = tf.sparse_split(sp_input=doc_batch, num_split=FLAGS.negative_size, axis=1)
     doc_l1_batch = []
     for doc in doc_batches:
         doc_l1_batch.append(tf.sparse_tensor_dense_matmul(tf.sparse_reshape(doc, shape=[BS, BIGRAM_D]), weight1) + bias1)
     doc_l1 = tf.reshape(tf.convert_to_tensor(doc_l1_batch), shape=[BS, FLAGS.negative_size, -1])
-    print("tmp shape is %s" % doc_l1.get_shape())
+    print("doc_l1 shape is %s" % doc_l1.get_shape())
     # tf.convert_to_tensor_or_sparse_tensor(tf.squeeze(doc_l1_batch, axis=0))
 
     query_l1_out = tf.nn.relu(query_l1)
@@ -249,8 +248,13 @@ with tf.name_scope('L2'):
 
     query_l2 = tf.matmul(query_l1_out, weight2) + bias2
     print("query_l2 shape is %s" % query_l2.get_shape())    # [1000, 120]
-    doc_l2 = tf.matmul(doc_l1_out, weight2) + bias2
-    print("doc_l2 shape is %s" % doc_l2.get_shape())    # [1000, 20, 120]
+
+    doc_batches = tf.split(value=doc_l1_out, num_or_size_splits=FLAGS.negative_size, axis=1)
+    doc_l2_batch = []
+    for doc in doc_batches:
+        doc_l2_batch.append(tf.matmul(tf.squeeze(doc), weight2) + bias2)
+    doc_l2 = tf.reshape(tf.convert_to_tensor(doc_l2_batch), shape=[BS, FLAGS.negative_size, -1])
+    print("doc_l2 shape is %s" % doc_l2.get_shape()[2])    # [1000, 20, 120]
     query_y = tf.nn.relu(query_l2)
     print("query_y shape is %s" % query_y.get_shape())    # [1000, 120]
     doc_y = tf.nn.relu(doc_l2)
