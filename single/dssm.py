@@ -46,59 +46,61 @@ def load_samples(file_path):
         elements = line.split('\001')
         if len(elements) < 2:
             continue
-        user_query = elements[0]
-        documents = elements[1].split('\002')
-
-        document_dict = {}
-        for document in documents:
-            sub_elements = document.split('\t')
-            document_dict[sub_elements[0]] = int(sub_elements[1])
-
-        sentence1 = elements[0].split("\001")[0]
-        sentence2 = elements[0].split("\001")[1]
-        label = elements[1]
-        labels.append(int(label))
-        sent1_words = sentence1.split(',')
-        sent1_len = len(sent1_words)
-        sent2_words = sentence2.split(',')
-        sent2_len = len(sent2_words)
+        user_query_list = elements[0].split(",")
+        user_query_len = len(user_query_list)
         word_index_list = []
-        for index,word in enumerate(sent1_words):
-            if index + 2 < sent1_len:
-                key = word + separator + sent1_words[index + 1] + separator + sent1_words[index + 2]
+        for index,word in enumerate(user_query_list):
+            if index + 2 < user_query_len:
+                key = word + separator + user_query_list[index + 1] + separator + user_query_list[index + 2]
                 if key not in trigram_dict:
                     trigram_dict[key] = len(trigram_dict) + 1
                 word_index_list.append(trigram_dict[key])
-            elif index + 2 >= sent1_len:
-                key = word + separator + sent1_words[index+1] + separator + placeholder
+            elif index + 2 >= user_query_len:
+                key = word + separator + user_query_list[index+1] + separator + placeholder
                 if key not in trigram_dict:
                     trigram_dict[key] = len(trigram_dict) + 1
                 word_index_list.append(trigram_dict[key])
-            elif index + 1 >= sent1_len:
-                key = word+separator+placeholder+separator+placeholder
+            elif index + 1 >= user_query_len:
+                key = word + separator + placeholder + separator + placeholder
                 if key not in trigram_dict:
                     trigram_dict[key] = len(trigram_dict) + 1
                 word_index_list.append(trigram_dict[key])
         source_samples.append(word_index_list)
-        word_index_list = []
-        for index,word in enumerate(sent2_words):
-            if index + 2 < sent2_len:
-                key = word + separator + sent2_words[index + 1] + separator + sent2_words[index + 2]
-                if key not in trigram_dict:
-                    trigram_dict[key] = len(trigram_dict) + 1
-                word_index_list.append(trigram_dict[key])
-            elif index + 2 >= sent2_len:
-                key = word + separator + sent2_words[index+1] + separator + placeholder
-                if key not in trigram_dict:
-                    trigram_dict[key] = len(trigram_dict) + 1
-                word_index_list.append(trigram_dict[key])
-            elif index + 1 >= sent1_len:
-                key = word+separator+placeholder+separator+placeholder
-                if key not in trigram_dict:
-                    trigram_dict[key] = len(trigram_dict) + 1
-                word_index_list.append(trigram_dict[key])
-        target_samples.append(word_index_list)
+
+        documents = elements[1].split('\002')
+        document_dict = {}
+        for document in documents:
+            sub_elements = document.split('\t')
+            document = sub_elements[0].split(",")
+            document_len = len(document)
+            label = sub_elements[1]
+
+            total_list = []
+            word_index_list = []
+            for index, word in enumerate(document):
+                if index + 2 < document_len:
+                    key = word + separator + document[index + 1] + separator + document[index + 2]
+                    if key not in trigram_dict:
+                        trigram_dict[key] = len(trigram_dict) + 1
+                    word_index_list.append(trigram_dict[key])
+                elif index + 2 >= document_len:
+                    key = word + separator + document[index + 1] + separator + placeholder
+                    if key not in trigram_dict:
+                        trigram_dict[key] = len(trigram_dict) + 1
+                    word_index_list.append(trigram_dict[key])
+                elif index + 1 >= document_len:
+                    key = word + separator + placeholder + separator + placeholder
+                    if key not in trigram_dict:
+                        trigram_dict[key] = len(trigram_dict) + 1
+                    word_index_list.append(trigram_dict[key])
+            if label == "1":
+                total_list = [word_index_list] + total_list
+            else:
+                total_list.append(word_index_list)
+        target_samples.append(total_list)
     input_file.close()
+
+    print("trigram_dict length is %d" % len(trigram_dict))
     TRIGRAM_D = len(trigram_dict) + 1
     for i in xrange(len(source_samples)):
         tmp = [0] * TRIGRAM_D
@@ -106,10 +108,13 @@ def load_samples(file_path):
             tmp[item] = 1
         source_samples[i] = tmp
     for i in xrange(len(target_samples)):
-        tmp = [0] * TRIGRAM_D
-        for item in target_samples[i]:
-            tmp[item] = 1
-        target_samples[i] = tmp
+        new_list = []
+        for j in xrange(len(target_samples[i])):
+            tmp = [0] * TRIGRAM_D
+            for item in target_samples[i][j]:
+                tmp[item] = 1
+            new_list.append(tmp)
+        target_samples[i] = new_list
 
     return (source_samples, target_samples, TRIGRAM_D)
 
@@ -136,7 +141,7 @@ L1_N = 400
 L2_N = 120
 
 query_in_shape = np.array([BS, TRIGRAM_D], np.int64)
-doc_in_shape = np.array([BS, TRIGRAM_D], np.int64)
+doc_in_shape = np.array([BS, FLAGS.negative_size, TRIGRAM_D], np.int64)
 
 def variable_summaries(var, name):
     """Attach a lot of summaries to a Tensor."""
@@ -157,7 +162,7 @@ with tf.name_scope('input'):
     print("query_batch shape is %s" % query_batch.get_shape())    # [1000, 49284]
     # Shape [BS, TRIGRAM_D]
     doc_batch = tf.sparse_placeholder(tf.float32, shape=doc_in_shape, name='DocBatch')
-    print("doc_batch shape is %s" % doc_batch.get_shape())    # [1000, 49284]
+    print("doc_batch shape is %s" % doc_batch.get_shape())    # [1000, 20, 49284]
 
 with tf.name_scope('L1'):
     l1_par_range = np.sqrt(6.0 / (TRIGRAM_D + L1_N))
@@ -174,7 +179,7 @@ with tf.name_scope('L1'):
     query_l1_out = tf.nn.relu(query_l1)
     print("query_l1_out shape is %s" % query_l1_out.get_shape())    # [1000, 400]
     doc_l1_out = tf.nn.relu(doc_l1)
-    print("doc_l1_out shape is %s" % doc_l1_out.get_shape())    # [1000, 400]
+    print("doc_l1_out shape is %s" % doc_l1_out.get_shape())    # [1000, 20, 400]
 
 with tf.name_scope('L2'):
     l2_par_range = np.sqrt(6.0 / (L1_N + L2_N))
@@ -187,29 +192,16 @@ with tf.name_scope('L2'):
     query_l2 = tf.matmul(query_l1_out, weight2) + bias2
     print("query_l2 shape is %s" % query_l2.get_shape())    # [1000, 120]
     doc_l2 = tf.matmul(doc_l1_out, weight2) + bias2
-    print("doc_l2 shape is %s" % doc_l2.get_shape())    # [1000, 120]
+    print("doc_l2 shape is %s" % doc_l2.get_shape())    # [1000, 20, 120]
     query_y = tf.nn.relu(query_l2)
     print("query_y shape is %s" % query_y.get_shape())    # [1000, 120]
     doc_y = tf.nn.relu(doc_l2)
-    print("doc_y shape is %s" % doc_y.get_shape())    # [1000, 120]
-
-'''
-with tf.name_scope('FD_rotate'):
-    # Rotate FD+ to produce 50 FD-
-    temp = tf.tile(doc_y, [1, 1])
-
-    for i in range(NEG):
-        rand = int((random.random() + i) * BS / NEG)
-        doc_y = tf.concat(0,
-                          [doc_y,
-                           tf.slice(temp, [rand, 0], [BS - rand, -1]),
-                           tf.slice(temp, [0, 0], [rand, -1])])
-'''
+    print("doc_y shape is %s" % doc_y.get_shape())    # [1000, 20, 120]
 
 with tf.name_scope('Cosine_Similarity'):
     # Cosine similarity
-    #query_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True)), [NEG + 1, 1])    # [51000, 1]
-    query_norm = tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True))
+    query_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True)), [NEG + 1, 1])    # [51000, 1]
+    #query_norm = tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True))
     doc_norm = tf.sqrt(tf.reduce_sum(tf.square(doc_y), 1, True))
 
     prod = tf.reduce_sum(tf.multiply(tf.tile(query_y, [NEG + 1, 1]), doc_y), 1, True)
