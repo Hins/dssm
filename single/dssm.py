@@ -8,7 +8,7 @@ import tensorflow as tf
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('file_path', '~/dssm/data/wb.dat', 'sample files')
+flags.DEFINE_string('file_path', '/root/dssm/data/wb.dat', 'sample files')
 flags.DEFINE_float('train_set_ratio', 0.7, 'train set ratio')
 flags.DEFINE_string('summaries_dir', '~/dssm/data/dssm-400-120-relu', 'Summaries directory')
 flags.DEFINE_float('learning_rate', 0.1, 'Initial learning rate.')
@@ -36,47 +36,24 @@ bigram_count = {}
 
 BIGRAM_D = 49284
 
-#def load_samples(file_path):
-#global TRIGRAM_D
+def load_samples(file_path):
+    global BIGRAM_D
 
-'''
-source_samples = []
-target_samples = []
-input_file = open('/root/dssm/data/wb.dat', 'r')
+    source_samples = []
+    target_samples = []
+    input_file = open('/root/dssm/data/wb.dat', 'r')
 
-# calculate trigram count
-for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
-    line = line.replace('\n', '').replace('\r', '')
-    elements = line.split('\001')
-    if len(elements) < 2:
-        continue
-    user_query_list = elements[0].split(",")
-    user_query_len = len(user_query_list)
-    word_index_list = []
-    for index,word in enumerate(user_query_list):
-        if index + 1 < user_query_len:
-            key = word + separator + user_query_list[index + 1]
-            if key not in bigram_count:
-                bigram_count[key] = 1
-            else:
-                bigram_count[key] += 1
-        else:
-            key = word + separator + placeholder
-            if key not in bigram_count:
-                bigram_count[key] = 1
-            else:
-                bigram_count[key] += 1
-
-    documents = elements[1].split('\002')
-    document_dict = {}
-    for document in documents:
-        sub_elements = document.split('\t')
-        document = sub_elements[0].split(",")
-        document_len = len(document)
-
-        for index, word in enumerate(document):
-            if index + 1 < document_len:
-                key = word + separator + document[index + 1]
+    # calculate trigram count
+    for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
+        line = line.replace('\n', '').replace('\r', '')
+        elements = line.split('\001')
+        if len(elements) < 2:
+            continue
+        user_query_list = elements[0].split(",")
+        user_query_len = len(user_query_list)
+        for index,word in enumerate(user_query_list):
+            if index + 1 < user_query_len:
+                key = word + separator + user_query_list[index + 1]
                 if key not in bigram_count:
                     bigram_count[key] = 1
                 else:
@@ -87,49 +64,42 @@ for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2
                     bigram_count[key] = 1
                 else:
                     bigram_count[key] += 1
-input_file.seek(0)
 
-print("calculate bigram count complete")
+        documents = elements[1].split('\002')
+        for document in documents:
+            sub_elements = document.split('\t')
+            document = sub_elements[0].split(",")
+            document_len = len(document)
 
-for line_count, line in enumerate(input_file):    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
-    line = line.replace('\n', '').replace('\r', '')
-    elements = line.split('\001')
-    if len(elements) < 2:
-        continue
-    user_query_list = elements[0].split(",")
-    user_query_len = len(user_query_list)
-    word_index_list = []
-    for index,word in enumerate(user_query_list):
-        if index + 1 < user_query_len:
-            key = word + separator + user_query_list[index + 1]
-            #if bigram_count[key] > 5:
-            if key not in bigram_dict:
-                bigram_dict[key] = len(bigram_dict) + 1
-            word_index_list.append(bigram_dict[key])
-        else:
-            key = word + separator + placeholder
-            #if trigram_count[key] > 5:
-            if key not in bigram_dict:
-                bigram_dict[key] = len(bigram_dict) + 1
-            word_index_list.append(bigram_dict[key])
-    if len(word_index_list) == 0:
-        continue
-    source_samples.append(word_index_list)
+            for index, word in enumerate(document):
+                if index + 1 < document_len:
+                    key = word + separator + document[index + 1]
+                    if key not in bigram_count:
+                        bigram_count[key] = 1
+                    else:
+                        bigram_count[key] += 1
+                else:
+                    key = word + separator + placeholder
+                    if key not in bigram_count:
+                        bigram_count[key] = 1
+                    else:
+                        bigram_count[key] += 1
+    input_file.seek(0)
 
-    documents = elements[1].split('\002')
-    document_dict = {}
-    for document in documents:
-        sub_elements = document.split('\t')
-        document = sub_elements[0].split(",")
-        document_len = len(document)
-        label = sub_elements[1]
+    print("calculate bigram count complete")
 
-        total_list = []
+    for line_count, line in enumerate(input_file):    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
+        line = line.replace('\n', '').replace('\r', '')
+        elements = line.split('\001')
+        if len(elements) < 2:
+            continue
+        user_query_list = elements[0].split(",")
+        user_query_len = len(user_query_list)
         word_index_list = []
-        for index, word in enumerate(document):
-            if index + 2 < document_len:
-                key = word + separator + document[index + 1] + separator + document[index + 2]
-                # if trigram_count[key] > 5:
+        for index,word in enumerate(user_query_list):
+            if index + 1 < user_query_len:
+                key = word + separator + user_query_list[index + 1]
+                #if bigram_count[key] > 5:
                 if key not in bigram_dict:
                     bigram_dict[key] = len(bigram_dict) + 1
                 word_index_list.append(bigram_dict[key])
@@ -141,33 +111,58 @@ for line_count, line in enumerate(input_file):    # <user_query>\001<document1>\
                 word_index_list.append(bigram_dict[key])
         if len(word_index_list) == 0:
             continue
-        if label == "1":
-            total_list = [word_index_list] + total_list
-        else:
-            total_list.append(word_index_list)
-    target_samples.append(total_list)
-input_file.close()
+        source_samples.append(word_index_list)
 
-print("bigram_dict length is %d" % len(bigram_dict))
-BIGRAM_D = len(bigram_dict) + 1
+        documents = elements[1].split('\002')
+        for document in documents:
+            sub_elements = document.split('\t')
+            document = sub_elements[0].split(",")
+            document_len = len(document)
+            label = sub_elements[1]
 
-user_query_dat = np.zeros(shape=[line_count+1, BIGRAM_D])
-document_dat = np.zeros(shape=[line_count+1, FLAGS.negative_size * BIGRAM_D])    # flat document one-hot data
+            total_list = []
+            word_index_list = []
+            for index, word in enumerate(document):
+                if index + 2 < document_len:
+                    key = word + separator + document[index + 1] + separator + document[index + 2]
+                    # if trigram_count[key] > 5:
+                    if key not in bigram_dict:
+                        bigram_dict[key] = len(bigram_dict) + 1
+                    word_index_list.append(bigram_dict[key])
+                else:
+                    key = word + separator + placeholder
+                    #if trigram_count[key] > 5:
+                    if key not in bigram_dict:
+                        bigram_dict[key] = len(bigram_dict) + 1
+                    word_index_list.append(bigram_dict[key])
+            if len(word_index_list) == 0:
+                continue
+            if label == "1":
+                total_list = [word_index_list] + total_list
+            else:
+                total_list.append(word_index_list)
+        target_samples.append(total_list)
+    input_file.close()
 
-for i in xrange(len(source_samples)):
-    for item in source_samples[i]:
-        if item > user_query_dat.shape[1]:
-            print(item)
-        user_query_dat[i][item] = 1
-print('source_samples load complete')
-for i in xrange(len(target_samples)):
-    for j in xrange(len(target_samples[i])):
-        for k in target_samples[i][j]:
-            document_dat[i][j*BIGRAM_D+k] = 1
-print('target_samples load complete')
+    print("bigram_dict length is %d" % len(bigram_dict))
+    BIGRAM_D = len(bigram_dict) + 1
 
-    #return (source_samples, target_samples, TRIGRAM_D)
-'''
+    user_query_dat = np.zeros(shape=[line_count+1, BIGRAM_D])
+    document_dat = np.zeros(shape=[line_count+1, FLAGS.negative_size * BIGRAM_D])    # flat document one-hot data
+
+    for i in xrange(len(source_samples)):
+        for item in source_samples[i]:
+            if item > user_query_dat.shape[1]:
+                print(item)
+            user_query_dat[i][item] = 1
+    print('source_samples load complete')
+    for i in xrange(len(target_samples)):
+        for j in xrange(len(target_samples[i])):
+            for k in target_samples[i][j]:
+                document_dat[i][j*BIGRAM_D+k] = 1
+    print('target_samples load complete')
+
+    return (user_query_dat, document_dat, BIGRAM_D)
 
 '''
 def load_train_data(path):
@@ -262,19 +257,31 @@ with tf.name_scope('L2'):
 
 with tf.name_scope('Cosine_Similarity'):
     # Cosine similarity
-    query_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True)), [NEG + 1, 1])    # [51000, 1]
-    doc_norm = tf.sqrt(tf.reduce_sum(tf.square(doc_y), 1, True))    # [1000, 1]
+    query_y_tile = tf.tile(query_y, [1, FLAGS.negative_size])    # [1000, 2400], 2400 = 20 * 120
+    print("query_y_tile shape is %s" % query_y_tile.get_shape())
+    doc_y_concat = tf.reshape(doc_y, shape=[BS, -1])    # [1000, 2400]
+    print("doc_y_concat shape is %s" % doc_y_concat.get_shape())
+    query_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True)), [1, FLAGS.negative_size])    # [1000, 20]
+    print("query_norm shape is %s" % query_norm.get_shape())
+    doc_norm = tf.squeeze(tf.sqrt(tf.reduce_sum(tf.square(doc_y), 2, True)))    # [1000, 20]
+    print("doc_norm shape is %s" % doc_norm.get_shape())
+    print("tf.multiply(query_y_tile, doc_y_concat) shape is %s" % tf.multiply(query_y_tile, doc_y_concat).get_shape())
+    prod = tf.reduce_sum(tf.reshape(tf.multiply(query_y_tile, doc_y_concat), shape=[BS, FLAGS.negative_size, -1]), 2)    # [1000, 20]
+    print("prod shape is %s" % prod.get_shape())
+    norm_prod = tf.multiply(query_norm, doc_norm)    # [1000, 20]
+    print("norm_prod shape is %s" % norm_prod.get_shape())
 
-    prod = tf.reduce_sum(tf.multiply(tf.tile(query_y, [NEG + 1, 1]), doc_y), 1, True)
-    norm_prod = tf.multiply(query_norm, doc_norm)
-
-    cos_sim_raw = tf.truediv(prod, norm_prod)
-    cos_sim = tf.transpose(tf.reshape(tf.transpose(cos_sim_raw), [NEG + 1, BS])) * 20    # 20 is \gamma
+    cos_sim_raw = tf.truediv(prod, norm_prod)    # [1000, 20]
+    print("cos_sim_raw shape is %s" % cos_sim_raw.get_shape())
+    cos_sim = tf.transpose(tf.reshape(tf.transpose(cos_sim_raw), [FLAGS.negative_size, BS])) * 20    # 20 is \gamma, [1000, 20]
+    print("cos_sim shape is %s" % cos_sim.get_shape())
 
 with tf.name_scope('Loss'):
     # Train Loss
-    prob = tf.nn.softmax((cos_sim))
-    hit_prob = tf.slice(prob, [0, 0], [-1, 1])
+    prob = tf.nn.softmax((cos_sim))    # [1000, 20]
+    print("prob shape is %s" % prob.get_shape())
+    hit_prob = tf.slice(prob, [0, 0], [-1, 1])    # [1000, 1]
+    print("hit_prob shape is %s" % hit_prob.get_shape())
     loss = -tf.reduce_sum(tf.log(hit_prob)) / BS
     tf.summary.scalar('loss', loss)
 
@@ -282,17 +289,16 @@ with tf.name_scope('Training'):
     # Optimizer
     train_step = tf.train.GradientDescentOptimizer(FLAGS.learning_rate).minimize(loss)
 
-# with tf.name_scope('Accuracy'):
-#     correct_prediction = tf.equal(tf.argmax(prob, 1), 0)
-#     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-#     tf.scalar_summary('accuracy', accuracy)
+with tf.name_scope('Accuracy'):
+    correct_prediction = tf.equal(tf.argmax(prob, 1), 0)
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    tf.summary.scalar('accuracy', accuracy)
 
-merged = tf.merge_all_summaries()
+merged = tf.summary.merge_all()
 
 with tf.name_scope('Test'):
     average_loss = tf.placeholder(tf.float32)
     loss_summary = tf.summary.scalar('average_loss', average_loss)
-
 
 def pull_batch(query_data, doc_data, batch_idx):
     # start = time.time()
@@ -300,8 +306,6 @@ def pull_batch(query_data, doc_data, batch_idx):
     doc_in = doc_data[batch_idx * BS:(batch_idx + 1) * BS, :]
     query_in = query_in.tocoo()
     doc_in = doc_in.tocoo()
-
-
 
     query_in = tf.SparseTensorValue(
         np.transpose([np.array(query_in.row, dtype=np.int64), np.array(query_in.col, dtype=np.int64)]),
@@ -333,9 +337,9 @@ config.gpu_options.allow_growth = True
 #config = tf.ConfigProto(device_count= {'GPU' : 0})
 
 with tf.Session(config=config) as sess:
-    sess.run(tf.initialize_all_variables())
-    train_writer = tf.train.SummaryWriter(FLAGS.summaries_dir + '~/dssm/data/train', sess.graph)
-    test_writer = tf.train.SummaryWriter(FLAGS.summaries_dir + '~/dssm/data/test', sess.graph)
+    sess.run(tf.global_variables_initializer())
+    train_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '~/dssm/data/train', sess.graph)
+    test_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '~/dssm/data/test', sess.graph)
 
     # Actual execution
     start = time.time()
@@ -343,12 +347,15 @@ with tf.Session(config=config) as sess:
     # fbp_time = 0
 
     (query_samples, doc_samples, trigram_dict_size) = load_samples(FLAGS.file_path)
-    sample_size = len(query_samples)
-    train_set_size = int(sample_size / BS * FLAGS.train_set_ratio) * BS
-    query_train = query_samples[0:train_set_size,]
-    doc_train = doc_samples[0:train_set_size,]
-    query_test = query_samples[train_set_size:,]
-    doc_test = doc_samples[train_set_size:,]
+    sample_size = query_samples.shape[0]
+    r = np.random.randint(low=0, high=sample_size, size=int(sample_size / BS * FLAGS.train_set_ratio) * BS)
+    query_train = query_samples[r]
+    print("query_train shape is %s" % query_train.shape)
+    train_set_size = query_train.shape[0]
+    print("train_set_size is %d" % train_set_size)
+    doc_train = doc_samples[r]
+    query_test = query_samples[~r]
+    doc_test = doc_samples[~r]
 
     for step in range(FLAGS.max_steps):
         batch_idx = step % FLAGS.epoch_steps
