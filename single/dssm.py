@@ -10,7 +10,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('file_path', '/root/dssm/data/wb.dat', 'sample files')
 flags.DEFINE_float('train_set_ratio', 0.7, 'train set ratio')
-flags.DEFINE_string('summaries_dir', '~/dssm/data/dssm-400-120-relu', 'Summaries directory')
+flags.DEFINE_string('summaries_dir', '/root/dssm/data/dssm-400-120-relu', 'Summaries directory')
 flags.DEFINE_float('learning_rate', 0.1, 'Initial learning rate.')
 flags.DEFINE_integer('negative_size', 20, 'negative size')
 flags.DEFINE_integer('max_steps', 900000, 'Number of steps to run trainer.')
@@ -348,6 +348,7 @@ with tf.Session(config=config) as sess:
 
     (query_samples, doc_samples, trigram_dict_size) = load_samples(FLAGS.file_path)
     sample_size = query_samples.shape[0]
+    '''
     r = np.random.randint(low=0, high=sample_size, size=int(sample_size / BS * FLAGS.train_set_ratio) * BS)
     query_train = query_samples[r]
     print("query_train shape is %s" % query_train.shape)
@@ -418,4 +419,4 @@ with tf.Session(config=config) as sess:
             start = time.time()
             print ("Epoch #%-5d | Test  Loss: %-4.3f | Calc_LossTime: %-3.3fs" %
                    (step / FLAGS.epoch_steps, epoch_loss, start - end))
-
+    '''
