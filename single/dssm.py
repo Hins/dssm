@@ -351,8 +351,6 @@ with tf.Session(config=config) as sess:
 
     (query_samples, doc_samples, trigram_dict_size) = load_samples(FLAGS.file_path)
     sample_size = query_samples.shape[0]
-    print("sample_size is %d" % sample_size)
-    print("int((sample_size / BS * FLAGS.train_set_ratio) * BS) is %d" % int((sample_size / BS * FLAGS.train_set_ratio) * BS))
     r = random.sample(range(sample_size), int((sample_size / BS * FLAGS.train_set_ratio) * BS))
     query_train = query_samples[r]
     print(query_train.shape)
