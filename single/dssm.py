@@ -88,9 +88,7 @@ def load_samples(file_path):
 
     print("calculate bigram count complete")
 
-    counter = 0
     for line_count, line in enumerate(input_file):    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
-        counter += 1
         line = line.replace('\n', '').replace('\r', '')
         elements = line.split('\001')
         if len(elements) < 2:
@@ -148,8 +146,8 @@ def load_samples(file_path):
 
     print("bigram_dict length is %d" % len(bigram_dict))
     BIGRAM_D = len(bigram_dict) + 1
+    print("BIGRAM_D is %d" % BIGRAM_D)
 
-    print("line_count is %d, counter is %d" % (line_count, counter))
     user_query_dat = np.zeros(shape=[line_count+1, BIGRAM_D])
     document_dat = np.zeros(shape=[line_count+1, FLAGS.negative_size * BIGRAM_D])    # flat document one-hot data
 
@@ -165,8 +163,9 @@ def load_samples(file_path):
                 document_dat[i][j*BIGRAM_D+k] = 1
     print('target_samples load complete')
 
-    return (user_query_dat, document_dat, BIGRAM_D)
+    return (user_query_dat, document_dat)
 
+(query_samples, doc_samples) = load_samples(FLAGS.file_path)
 '''
 def load_train_data(path):
     # return load_samples(path)
@@ -184,7 +183,7 @@ end = time.time()
 print("Loading data from HDD to memory: %.2fs" % (end - start))
 
 # NEG = 50
-BS = 1000
+BS = 2
 
 L1_N = 400
 L2_N = 120
@@ -307,6 +306,7 @@ def pull_batch(query_data, doc_data, batch_idx):
     # start = time.time()
     query_in = query_data[batch_idx * BS:(batch_idx + 1) * BS, :]
     doc_in = doc_data[batch_idx * BS:(batch_idx + 1) * BS, :]
+    '''
     query_in = query_in.tocoo()
     doc_in = doc_in.tocoo()
 
@@ -318,6 +318,7 @@ def pull_batch(query_data, doc_data, batch_idx):
         np.transpose([np.array(doc_in.row, dtype=np.int64), np.array(doc_in.col, dtype=np.int64)]),
         np.array(doc_in.data, dtype=np.float),
         np.array(doc_in.shape, dtype=np.int64))
+    '''
 
     # end = time.time()
     # print("Pull_batch time: %f" % (end - start))
@@ -325,12 +326,14 @@ def pull_batch(query_data, doc_data, batch_idx):
     return query_in, doc_in
 
 
-def feed_dict(Train, query_data, doc_data, batch_idx):
+def feed_dict(query_data, doc_data, batch_idx):
     """Make a TensorFlow feed_dict: maps data onto Tensor placeholders."""
-    if Train:
-        query_in, doc_in = pull_batch(query_data, doc_data, batch_idx)
-    else:
-        query_in, doc_in = pull_batch(query_data, doc_data, batch_idx)
+    query_in, doc_in = pull_batch(query_data, doc_data, batch_idx)
+    doc_in = np.reshape(doc_in, newshape=(BS, FLAGS.negative_size, BIGRAM_D))
+    print("query_in.shape is:")
+    print(query_in.shape)
+    print("doc_in.shape is:")
+    print(doc_in.shape)
     return {query_batch: query_in, doc_batch: doc_in}
 
 
@@ -349,20 +352,15 @@ with tf.Session(config=config) as sess:
     # fp_time = 0
     # fbp_time = 0
 
-    (query_samples, doc_samples, trigram_dict_size) = load_samples(FLAGS.file_path)
     sample_size = query_samples.shape[0]
     r = random.sample(range(sample_size), int((sample_size / BS * FLAGS.train_set_ratio) * BS))
+    test_r = np.setdiff1d(range(sample_size), r)
     query_train = query_samples[r]
-    print(query_train.shape)
     train_set_size = query_train.shape[0]
-    print(train_set_size)
     doc_train = doc_samples[r]
-    query_test = query_samples[~r]
-    print(query_test.shape)
-    doc_test = doc_samples[~r]
-    print(doc_test.shape)
+    query_test = query_samples[test_r]
+    doc_test = doc_samples[test_r]
 
-    '''
     for step in range(FLAGS.max_steps):
         batch_idx = step % FLAGS.epoch_steps
         #if batch_idx % FLAGS.pack_size == 0:
@@ -376,7 +374,7 @@ with tf.Session(config=config) as sess:
 
         if batch_idx % (FLAGS.pack_size / 64) == 0:
             progress = 100.0 * batch_idx / FLAGS.epoch_steps
-            sys.stdout.write("\r%.2f%% Epoch" % progress)
+            sys.stdout.write("\r%.2f%% Epoch\r" % progress)
             sys.stdout.flush()
 
         # t1 = time.time()
@@ -385,7 +383,12 @@ with tf.Session(config=config) as sess:
         # fp_time += t2 - t1
         # #print(t2-t1)
         # t1 = time.time()
-        sess.run(train_step, feed_dict=feed_dict(True, query_train, doc_train, batch_idx % FLAGS.pack_size))
+        query_in = query_train[(batch_idx % FLAGS.pack_size)* BS:(batch_idx + 1) * BS, :]
+        print(query_in.shape)
+        doc_in = np.reshape(doc_train[(batch_idx % FLAGS.pack_size)* BS:(batch_idx + 1) * BS, :], newshape=(BS, FLAGS.negative_size, BIGRAM_D))
+        print(doc_in.shape)
+        sess.run(train_step, feed_dict={query_batch: [query_in], doc_batch: doc_in})
+        # sess.run(train_step, feed_dict=feed_dict(query_train, doc_train, batch_idx % FLAGS.pack_size))
         # t2 = time.time()
         # fbp_time += t2 - t1
         # #print(t2 - t1)
@@ -424,4 +427,3 @@ with tf.Session(config=config) as sess:
             start = time.time()
             print ("Epoch #%-5d | Test  Loss: %-4.3f | Calc_LossTime: %-3.3fs" %
                    (step / FLAGS.epoch_steps, epoch_loss, start - end))
-    '''
