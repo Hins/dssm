@@ -8,7 +8,7 @@ import tensorflow as tf
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('file_path', '/root/dssm/data/wb.dat', 'sample files')
+flags.DEFINE_string('file_path', '/root/dssm/data/wb.dat.10', 'sample files')
 flags.DEFINE_float('train_set_ratio', 0.7, 'train set ratio')
 flags.DEFINE_string('summaries_dir', '/root/dssm/data/dssm-400-120-relu', 'Summaries directory')
 flags.DEFINE_float('learning_rate', 0.1, 'Initial learning rate.')
@@ -41,7 +41,7 @@ def load_samples(file_path):
 
     source_samples = []
     target_samples = []
-    input_file = open('/root/dssm/data/wb.dat', 'r')
+    input_file = open(file_path, 'r')
 
     # calculate trigram count
     for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
@@ -88,7 +88,9 @@ def load_samples(file_path):
 
     print("calculate bigram count complete")
 
+    counter = 0
     for line_count, line in enumerate(input_file):    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
+        counter += 1
         line = line.replace('\n', '').replace('\r', '')
         elements = line.split('\001')
         if len(elements) < 2:
@@ -147,6 +149,7 @@ def load_samples(file_path):
     print("bigram_dict length is %d" % len(bigram_dict))
     BIGRAM_D = len(bigram_dict) + 1
 
+    print("line_count is %d, counter is %d" % (line_count, counter))
     user_query_dat = np.zeros(shape=[line_count+1, BIGRAM_D])
     document_dat = np.zeros(shape=[line_count+1, FLAGS.negative_size * BIGRAM_D])    # flat document one-hot data
 
@@ -348,16 +351,20 @@ with tf.Session(config=config) as sess:
 
     (query_samples, doc_samples, trigram_dict_size) = load_samples(FLAGS.file_path)
     sample_size = query_samples.shape[0]
-    '''
-    r = np.random.randint(low=0, high=sample_size, size=int(sample_size / BS * FLAGS.train_set_ratio) * BS)
+    print("sample_size is %d" % sample_size)
+    print("int((sample_size / BS * FLAGS.train_set_ratio) * BS) is %d" % int((sample_size / BS * FLAGS.train_set_ratio) * BS))
+    r = random.sample(range(sample_size), int((sample_size / BS * FLAGS.train_set_ratio) * BS))
     query_train = query_samples[r]
-    print("query_train shape is %s" % query_train.shape)
+    print(query_train.shape)
     train_set_size = query_train.shape[0]
-    print("train_set_size is %d" % train_set_size)
+    print(train_set_size)
     doc_train = doc_samples[r]
     query_test = query_samples[~r]
+    print(query_test.shape)
     doc_test = doc_samples[~r]
+    print(doc_test.shape)
 
+    '''
     for step in range(FLAGS.max_steps):
         batch_idx = step % FLAGS.epoch_steps
         #if batch_idx % FLAGS.pack_size == 0:
