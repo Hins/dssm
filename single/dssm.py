@@ -39,8 +39,6 @@ BIGRAM_D = 49284
 def load_samples(file_path):
     global BIGRAM_D
 
-    source_samples = []
-    target_samples = []
     input_file = open(file_path, 'r')
 
     # calculate trigram count
@@ -88,68 +86,79 @@ def load_samples(file_path):
 
     print("calculate bigram count complete")
 
-    for line_count, line in enumerate(input_file):    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
+    user_indices = []
+    user_values = []
+    doc_indices = []
+    doc_values = []
+    for line_index, line in enumerate(input_file):    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
         line = line.replace('\n', '').replace('\r', '')
         elements = line.split('\001')
         if len(elements) < 2:
             continue
         user_query_list = elements[0].split(",")
         user_query_len = len(user_query_list)
-        word_index_list = []
+        query_indice_list = []
+        query_value_list = []
         for index,word in enumerate(user_query_list):
             if index + 1 < user_query_len:
                 key = word + separator + user_query_list[index + 1]
                 #if bigram_count[key] > 5:
                 if key not in bigram_dict:
                     bigram_dict[key] = len(bigram_dict) + 1
-                word_index_list.append(bigram_dict[key])
+                query_indice_list.append([line_index, bigram_dict[key]])
+                query_value_list.append(1.0)
             else:
                 key = word + separator + placeholder
                 #if trigram_count[key] > 5:
                 if key not in bigram_dict:
                     bigram_dict[key] = len(bigram_dict) + 1
-                word_index_list.append(bigram_dict[key])
-        if len(word_index_list) == 0:
+                query_indice_list.append([line_index, bigram_dict[key]])
+                query_value_list.append(1.0)
+        if len(query_indice_list) == 0:
             continue
-        source_samples.append(word_index_list)
 
         documents = elements[1].split('\002')
+        flag = True
+        doc_indice_list = []
+        doc_value_list = []
         for document in documents:
             sub_elements = document.split('\t')
             document = sub_elements[0].split(",")
             document_len = len(document)
-            label = sub_elements[1]
 
-            total_list = []
-            word_index_list = []
+            prev_size = len(doc_indice_list)
             for index, word in enumerate(document):
                 if index + 2 < document_len:
                     key = word + separator + document[index + 1] + separator + document[index + 2]
-                    # if trigram_count[key] > 5:
+                    #if trigram_count[key] > 5:
                     if key not in bigram_dict:
                         bigram_dict[key] = len(bigram_dict) + 1
-                    word_index_list.append(bigram_dict[key])
+                    doc_indice_list.append([line_index, index, bigram_dict[key]])
+                    doc_value_list.append(1.0)
                 else:
                     key = word + separator + placeholder
                     #if trigram_count[key] > 5:
                     if key not in bigram_dict:
                         bigram_dict[key] = len(bigram_dict) + 1
-                    word_index_list.append(bigram_dict[key])
-            if len(word_index_list) == 0:
-                continue
-            if label == "1":
-                total_list = [word_index_list] + total_list
-            else:
-                total_list.append(word_index_list)
-        target_samples.append(total_list)
+                    doc_indice_list.append([line_index, index, bigram_dict[key]])
+                    doc_value_list.append(1.0)
+            if prev_size == len(doc_indice_list):
+                flag = False
+                break
+        if flag == True:
+            user_indices.extend(query_indice_list)
+            user_values.extend(query_value_list)
+            doc_indices.extend(doc_indice_list)
+            doc_values.extend(doc_value_list)
+
     input_file.close()
 
-    print("bigram_dict length is %d" % len(bigram_dict))
     BIGRAM_D = len(bigram_dict) + 1
     print("BIGRAM_D is %d" % BIGRAM_D)
 
-    user_query_dat = np.zeros(shape=[line_count+1, BIGRAM_D])
-    document_dat = np.zeros(shape=[line_count+1, FLAGS.negative_size * BIGRAM_D])    # flat document one-hot data
+    '''
+    user_query_dat = np.zeros(shape=[line_index+1, BIGRAM_D])
+    document_dat = np.zeros(shape=[line_index+1, FLAGS.negative_size * BIGRAM_D])    # flat document one-hot data
 
     for i in xrange(len(source_samples)):
         for item in source_samples[i]:
@@ -162,10 +171,11 @@ def load_samples(file_path):
             for k in target_samples[i][j]:
                 document_dat[i][j*BIGRAM_D+k] = 1
     print('target_samples load complete')
+    '''
 
-    return (user_query_dat, document_dat)
+    return (user_indices, user_values, doc_indices, doc_values)
 
-(query_samples, doc_samples) = load_samples(FLAGS.file_path)
+(user_indices, user_values, doc_indices, doc_values) = load_samples(FLAGS.file_path)
 '''
 def load_train_data(path):
     # return load_samples(path)
@@ -302,23 +312,28 @@ with tf.name_scope('Test'):
     average_loss = tf.placeholder(tf.float32)
     loss_summary = tf.summary.scalar('average_loss', average_loss)
 
-def pull_batch(query_data, doc_data, batch_idx):
+def pull_batch(user_indices, user_values, doc_indices, doc_values, batch_idx):
     # start = time.time()
-    query_in = query_data[batch_idx * BS:(batch_idx + 1) * BS, :]
-    doc_in = doc_data[batch_idx * BS:(batch_idx + 1) * BS, :]
-    '''
-    query_in = query_in.tocoo()
-    doc_in = doc_in.tocoo()
+    lower_bound = batch_idx * BS
+    upper_bound = (batch_idx + 1) * BS
+    batch_indice_list = []
+    batch_value_list = []
+    for index, item in enumerate(user_indices):
+        if item[0] >= lower_bound and item[0] < upper_bound:
+            item[0] %= BS
+            batch_indice_list.append(item)
+            batch_value_list.append(user_values[index])
+    print(batch_indice_list)
+    query_in = tf.SparseTensorValue(np.array(batch_indice_list), np.array(batch_value_list), query_in_shape)
 
-    query_in = tf.SparseTensorValue(
-        np.transpose([np.array(query_in.row, dtype=np.int64), np.array(query_in.col, dtype=np.int64)]),
-        np.array(query_in.data, dtype=np.float),
-        np.array(query_in.shape, dtype=np.int64))
-    doc_in = tf.SparseTensorValue(
-        np.transpose([np.array(doc_in.row, dtype=np.int64), np.array(doc_in.col, dtype=np.int64)]),
-        np.array(doc_in.data, dtype=np.float),
-        np.array(doc_in.shape, dtype=np.int64))
-    '''
+    batch_indice_list = []
+    batch_value_list = []
+    for index, item in enumerate(doc_indices):
+        if item[0] >= lower_bound and item[0] < upper_bound:
+            item[0] %= BS
+            batch_indice_list.append(item)
+            batch_value_list.append(doc_values[index])
+    doc_in = tf.SparseTensorValue(np.array(batch_indice_list), np.array(batch_value_list), doc_in_shape)
 
     # end = time.time()
     # print("Pull_batch time: %f" % (end - start))
@@ -326,14 +341,9 @@ def pull_batch(query_data, doc_data, batch_idx):
     return query_in, doc_in
 
 
-def feed_dict(query_data, doc_data, batch_idx):
+def feed_dict(user_indices, user_values, doc_indices, doc_values, batch_idx):
     """Make a TensorFlow feed_dict: maps data onto Tensor placeholders."""
-    query_in, doc_in = pull_batch(query_data, doc_data, batch_idx)
-    doc_in = np.reshape(doc_in, newshape=(BS, FLAGS.negative_size, BIGRAM_D))
-    print("query_in.shape is:")
-    print(query_in.shape)
-    print("doc_in.shape is:")
-    print(doc_in.shape)
+    query_in, doc_in = pull_batch(user_indices, user_values, doc_indices, doc_values, batch_idx)
     return {query_batch: query_in, doc_batch: doc_in}
 
 
@@ -352,6 +362,7 @@ with tf.Session(config=config) as sess:
     # fp_time = 0
     # fbp_time = 0
 
+    '''
     sample_size = query_samples.shape[0]
     r = random.sample(range(sample_size), int((sample_size / BS * FLAGS.train_set_ratio) * BS))
     test_r = np.setdiff1d(range(sample_size), r)
@@ -360,6 +371,7 @@ with tf.Session(config=config) as sess:
     doc_train = doc_samples[r]
     query_test = query_samples[test_r]
     doc_test = doc_samples[test_r]
+    '''
 
     for step in range(FLAGS.max_steps):
         batch_idx = step % FLAGS.epoch_steps
@@ -383,12 +395,30 @@ with tf.Session(config=config) as sess:
         # fp_time += t2 - t1
         # #print(t2-t1)
         # t1 = time.time()
-        query_in = query_train[(batch_idx % FLAGS.pack_size)* BS:(batch_idx + 1) * BS, :]
-        print(query_in.shape)
-        doc_in = np.reshape(doc_train[(batch_idx % FLAGS.pack_size)* BS:(batch_idx + 1) * BS, :], newshape=(BS, FLAGS.negative_size, BIGRAM_D))
-        print(doc_in.shape)
-        sess.run(train_step, feed_dict={query_batch: [query_in], doc_batch: doc_in})
-        # sess.run(train_step, feed_dict=feed_dict(query_train, doc_train, batch_idx % FLAGS.pack_size))
+
+        lower_bound = batch_idx * BS
+        upper_bound = (batch_idx + 1) * BS
+        batch_indice_list = []
+        batch_value_list = []
+        for index, item in enumerate(user_indices):
+            if item[0] >= lower_bound and item[0] < upper_bound:
+                item[0] %= BS
+                batch_indice_list.append(item)
+                batch_value_list.append(user_values[index])
+        query_in = tf.SparseTensorValue(np.array(batch_indice_list, dtype=np.int64), np.array(batch_value_list, dtype=np.float), query_in_shape)
+
+        batch_indice_list = []
+        batch_value_list = []
+        for index, item in enumerate(doc_indices):
+            if item[0] >= lower_bound and item[0] < upper_bound:
+                item[0] %= BS
+                batch_indice_list.append(item)
+                batch_value_list.append(doc_values[index])
+        doc_in = tf.SparseTensorValue(np.array(batch_indice_list), np.array(batch_value_list), doc_in_shape)
+        sess.run(train_step,
+                 feed_dict={query_batch: query_in, doc_batch: doc_in})
+
+        # sess.run(train_step, feed_dict=feed_dict(user_indices, user_values, doc_indices, doc_values, batch_idx % FLAGS.pack_size))
         # t2 = time.time()
         # fbp_time += t2 - t1
         # #print(t2 - t1)
