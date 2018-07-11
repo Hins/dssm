@@ -180,7 +180,7 @@ def load_train_data(path):
 end = time.time()
 print("Loading data from HDD to memory: %.2fs" % (end - start))
 
-NEG = 50
+# NEG = 50
 BS = 1000
 
 L1_N = 400
