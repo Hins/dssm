@@ -1,6 +1,6 @@
-import pickle
 import random
 import time
+import os
 import sys
 import numpy as np
 import tensorflow as tf
@@ -9,12 +9,12 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('file_path', '/root/dssm/data/wb.dat', 'sample files')
-flags.DEFINE_integer('batch_size', 10, 'train/test batch size')
+flags.DEFINE_integer('batch_size', 100, 'train/test batch size')
 flags.DEFINE_float('train_set_ratio', 0.7, 'train set ratio')
 flags.DEFINE_string('summaries_dir', '/root/dssm/data/dssm-400-120-relu', 'Summaries directory')
 flags.DEFINE_float('learning_rate', 0.1, 'Initial learning rate.')
 flags.DEFINE_integer('negative_size', 20, 'negative size')
-flags.DEFINE_integer('epoch_size', 5, "Number of training epoch.")
+flags.DEFINE_integer('epoch_size', 20, "Number of training epoch.")
 flags.DEFINE_integer('iteration', 10, "Number of training iteration.")
 flags.DEFINE_integer('l1_norm', 400, 'l1 normalization')
 flags.DEFINE_integer('l2_norm', 120, 'l2 normalization')
@@ -150,12 +150,15 @@ def load_samples(file_path):
     print("BIGRAM_D is %d" % BIGRAM_D)
 
     sample_size = (line_index + 1) / FLAGS.batch_size
+    print("sample_size is %d" % sample_size)
     train_index = random.sample(range(sample_size), int(sample_size * FLAGS.train_set_ratio))
     test_index = np.setdiff1d(range(sample_size), train_index)
 
-    return (user_indices, user_values, doc_indices, doc_values, train_index, test_index)
+    return (user_indices, user_values, doc_indices, doc_values, train_index, test_index, sample_size)
 
-(user_indices, user_values, doc_indices, doc_values, train_index_list, test_index_list) = load_samples(FLAGS.file_path)
+(user_indices, user_values, doc_indices, doc_values, train_index_list, test_index_list, sample_size) = load_samples(FLAGS.file_path)
+
+print("batch: %d" % (sample_size / FLAGS.batch_size))
 
 end = time.time()
 print("Loading data from HDD to memory: %.2fs" % (end - start))
@@ -262,14 +265,19 @@ with tf.device('/gpu:0'):
         # Optimizer
         train_step = tf.train.GradientDescentOptimizer(FLAGS.learning_rate).minimize(loss)
 
+dssm_model = tf.train.Saver()
+
 with tf.name_scope('Accuracy'):
     correct_prediction = tf.equal(tf.argmax(prob, 1), 0)
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    tf.summary.scalar('accuracy', accuracy)
+
+with tf.name_scope('Test'):
+    average_accuracy = tf.placeholder(tf.float32)
+    accuracy_summary = tf.summary.scalar('accuracy', average_accuracy)
 
 merged = tf.summary.merge_all()
 
-with tf.name_scope('Test'):
+with tf.name_scope('Train'):
     average_loss = tf.placeholder(tf.float32)
     loss_summary = tf.summary.scalar('average_loss', average_loss)
 
@@ -304,38 +312,62 @@ def pull_batch(batch_idx):
 
     return query_in, doc_in
 
-
 def feed_dict(batch_idx):
     """Make a TensorFlow feed_dict: maps data onto Tensor placeholders."""
     query_in, doc_in = pull_batch(batch_idx)
     return {query_batch: query_in, doc_batch: doc_in}
 
-config = tf.ConfigProto(allow_soft_placement=True)  # log_device_placement=True)
-config.gpu_options.allow_growth = True
-#if not FLAGS.gpu:
-#config = tf.ConfigProto(device_count= {'GPU' : 0})
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("dssm <output model>")
+        sys.exit()
 
-with tf.Session(config=config) as sess:
-    sess.run(tf.global_variables_initializer())
-    train_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '~/dssm/data/train', sess.graph)
-    test_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '~/dssm/data/test', sess.graph)
+    config = tf.ConfigProto(allow_soft_placement=True)  # log_device_placement=True)
+    config.gpu_options.allow_growth = True
+    #if not FLAGS.gpu:
+    #config = tf.ConfigProto(device_count= {'GPU' : 0})
 
-    for epoch_step in range(FLAGS.epoch_size):
-        epoch_loss = 0.0
-        for iter in range(FLAGS.iteration):
-            train_idx = iter % (len(train_index_list) + len(test_index_list))
-            if train_idx in train_index_list:
-                _, iter_loss = sess.run([train_step, loss],
-                         feed_dict=feed_dict(train_idx))
-                print("epoch %d : iteration %d, loss is %f" % (epoch_step, iter, iter_loss))
-                epoch_loss += iter_loss
-        train_writer.add_summary(epoch_loss / len(train_index_list), epoch_step + 1)
+    with tf.Session(config=config) as sess:
+        sess.run(tf.global_variables_initializer())
+        train_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '~/dssm/data/train', sess.graph)
+        test_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '~/dssm/data/test', sess.graph)
 
-        epoch_accuracy = 0.0
-        for iter in range(FLAGS.iteration):
-            test_idx = iter % (len(train_index_list) + len(test_index_list))
-            if test_idx in test_index_list:
-                iter_accuracy = sess.run(accuracy, feed_dict=feed_dict(test_idx))
-                print("epoch %d : iteration %d, accuracy is %f" % (epoch_step, iter, iter_accuracy))
-                epoch_accuracy += iter_accuracy
-        test_writer.add_summary(epoch_accuracy / len(test_index_list), epoch_step + 1)
+        if os.path.exists(sys.argv[1] + ".meta") == True:
+            dssm_model = tf.train.import_meta_graph(sys.argv[1] + '.meta')
+            dssm_model.restore(sess, sys.argv[1])
+
+            for epoch_step in range(FLAGS.epoch_size):
+                epoch_accuracy = 0.0
+                for iter in range(FLAGS.iteration):
+                    test_idx = iter % (len(train_index_list) + len(test_index_list))
+                    if test_idx in test_index_list:
+                        real_prob = sess.run(prob, feed_dict=feed_dict(test_idx))
+                        print(real_prob.shape)
+            sys.exit()
+
+        iteration = (sample_size / FLAGS.batch_size) if FLAGS.epoch_size < sample_size / FLAGS.batch_size else FLAGS.iteration
+        for epoch_step in range(FLAGS.epoch_size):
+            epoch_loss = 0.0
+            for iter in range(iteration):
+                train_idx = iter % (len(train_index_list) + len(test_index_list))
+                if train_idx in train_index_list:
+                    _, iter_loss = sess.run([train_step, loss],
+                             feed_dict=feed_dict(train_idx))
+                    print("epoch %d : iteration %d, loss is %f" % (epoch_step, iter, iter_loss))
+                    epoch_loss += iter_loss
+            epoch_loss /= len(train_index_list)
+            train_loss = sess.run(loss_summary, feed_dict={average_loss: epoch_loss})
+            train_writer.add_summary(train_loss, epoch_step + 1)
+
+            epoch_accuracy = 0.0
+            for iter in range(iteration):
+                test_idx = iter % (len(train_index_list) + len(test_index_list))
+                if test_idx in test_index_list:
+                    iter_accuracy = sess.run(accuracy, feed_dict=feed_dict(test_idx))
+                    print("epoch %d : iteration %d, accuracy is %f" % (epoch_step, iter, iter_accuracy))
+                    epoch_accuracy += iter_accuracy
+            epoch_accuracy /= len(test_index_list)
+            test_accuracy = sess.run(accuracy_summary, feed_dict={average_accuracy: epoch_accuracy})
+            test_writer.add_summary(test_accuracy, epoch_step + 1)
+        dssm_model.save(sess, sys.argv[1])
+        sess.close()
