@@ -8,14 +8,14 @@ import tensorflow as tf
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('file_path', '/root/dssm/data/wb.dat.10', 'sample files')
+flags.DEFINE_string('file_path', '/root/dssm/data/wb.dat', 'sample files')
+flags.DEFINE_integer('batch_size', 10, 'train/test batch size')
 flags.DEFINE_float('train_set_ratio', 0.7, 'train set ratio')
 flags.DEFINE_string('summaries_dir', '/root/dssm/data/dssm-400-120-relu', 'Summaries directory')
 flags.DEFINE_float('learning_rate', 0.1, 'Initial learning rate.')
 flags.DEFINE_integer('negative_size', 20, 'negative size')
-flags.DEFINE_integer('max_steps', 900000, 'Number of steps to run trainer.')
-flags.DEFINE_integer('epoch_steps', 18000, "Number of steps in one epoch.")
-flags.DEFINE_integer('pack_size', 2000, "Number of batches in one pickle pack.")
+flags.DEFINE_integer('epoch_size', 50, "Number of training epoch.")
+flags.DEFINE_integer('iteration', 10, "Number of training iteration.")
 flags.DEFINE_bool('gpu', 1, "Enable GPU or not")
 
 start = time.time()
@@ -156,26 +156,14 @@ def load_samples(file_path):
     BIGRAM_D = len(bigram_dict) + 1
     print("BIGRAM_D is %d" % BIGRAM_D)
 
-    '''
-    user_query_dat = np.zeros(shape=[line_index+1, BIGRAM_D])
-    document_dat = np.zeros(shape=[line_index+1, FLAGS.negative_size * BIGRAM_D])    # flat document one-hot data
+    sample_size = (line_index + 1) / FLAGS.batch_size
+    train_index = random.sample(range(sample_size), int(sample_size * FLAGS.train_set_ratio))
+    test_index = np.setdiff1d(range(sample_size), train_index)
 
-    for i in xrange(len(source_samples)):
-        for item in source_samples[i]:
-            if item > user_query_dat.shape[1]:
-                print(item)
-            user_query_dat[i][item] = 1
-    print('source_samples load complete')
-    for i in xrange(len(target_samples)):
-        for j in xrange(len(target_samples[i])):
-            for k in target_samples[i][j]:
-                document_dat[i][j*BIGRAM_D+k] = 1
-    print('target_samples load complete')
-    '''
+    return (user_indices, user_values, doc_indices, doc_values, train_index, test_index)
 
-    return (user_indices, user_values, doc_indices, doc_values)
+(user_indices, user_values, doc_indices, doc_values, train_index_list, test_index_list) = load_samples(FLAGS.file_path)
 
-(user_indices, user_values, doc_indices, doc_values) = load_samples(FLAGS.file_path)
 '''
 def load_train_data(path):
     # return load_samples(path)
@@ -193,13 +181,12 @@ end = time.time()
 print("Loading data from HDD to memory: %.2fs" % (end - start))
 
 # NEG = 50
-BS = 2
 
 L1_N = 400
 L2_N = 120
 
-query_in_shape = np.array([BS, BIGRAM_D], np.int64)
-doc_in_shape = np.array([BS, FLAGS.negative_size, BIGRAM_D], np.int64)
+query_in_shape = np.array([FLAGS.batch_size, BIGRAM_D], np.int64)
+doc_in_shape = np.array([FLAGS.batch_size, FLAGS.negative_size, BIGRAM_D], np.int64)
 
 def variable_summaries(var, name):
     """Attach a lot of summaries to a Tensor."""
@@ -215,11 +202,11 @@ def variable_summaries(var, name):
 
 
 with tf.name_scope('input'):
-    # Shape [BS, TRIGRAM_D].
-    query_batch = tf.sparse_placeholder(tf.float32, shape=query_in_shape, name='QueryBatch')
+    # Shape [FLAGS.batch_size, TRIGRAM_D].
+    query_batch = tf.sparse_placeholder(tf.float32, shape=[None, BIGRAM_D], name='QueryBatch')
     print("query_batch shape is %s" % query_batch.get_shape())    # [1000, BIGRAM_D]
-    # Shape [BS, TRIGRAM_D]
-    doc_batch = tf.sparse_placeholder(tf.float32, shape=doc_in_shape, name='DocBatch')
+    # Shape [FLAGS.batch_size, TRIGRAM_D]
+    doc_batch = tf.sparse_placeholder(tf.float32, shape=[None, FLAGS.negative_size, BIGRAM_D], name='DocBatch')
     print("doc_batch shape is %s" % doc_batch.get_shape())    # [1000, 20, BIGRAM_D]
 
 with tf.name_scope('L1'):
@@ -235,8 +222,8 @@ with tf.name_scope('L1'):
     doc_batches = tf.sparse_split(sp_input=doc_batch, num_split=FLAGS.negative_size, axis=1)
     doc_l1_batch = []
     for doc in doc_batches:
-        doc_l1_batch.append(tf.sparse_tensor_dense_matmul(tf.sparse_reshape(doc, shape=[BS, BIGRAM_D]), weight1) + bias1)
-    doc_l1 = tf.reshape(tf.convert_to_tensor(doc_l1_batch), shape=[BS, FLAGS.negative_size, -1])
+        doc_l1_batch.append(tf.sparse_tensor_dense_matmul(tf.sparse_reshape(doc, shape=[FLAGS.batch_size, BIGRAM_D]), weight1) + bias1)
+    doc_l1 = tf.reshape(tf.convert_to_tensor(doc_l1_batch), shape=[FLAGS.batch_size, FLAGS.negative_size, -1])
     print("doc_l1 shape is %s" % doc_l1.get_shape())
     # tf.convert_to_tensor_or_sparse_tensor(tf.squeeze(doc_l1_batch, axis=0))
 
@@ -260,7 +247,7 @@ with tf.name_scope('L2'):
     doc_l2_batch = []
     for doc in doc_batches:
         doc_l2_batch.append(tf.matmul(tf.squeeze(doc), weight2) + bias2)
-    doc_l2 = tf.reshape(tf.convert_to_tensor(doc_l2_batch), shape=[BS, FLAGS.negative_size, -1])
+    doc_l2 = tf.reshape(tf.convert_to_tensor(doc_l2_batch), shape=[FLAGS.batch_size, FLAGS.negative_size, -1])
     print("doc_l2 shape is %s" % doc_l2.get_shape()[2])    # [1000, 20, 120]
     query_y = tf.nn.relu(query_l2)
     print("query_y shape is %s" % query_y.get_shape())    # [1000, 120]
@@ -271,21 +258,21 @@ with tf.name_scope('Cosine_Similarity'):
     # Cosine similarity
     query_y_tile = tf.tile(query_y, [1, FLAGS.negative_size])    # [1000, 2400], 2400 = 20 * 120
     print("query_y_tile shape is %s" % query_y_tile.get_shape())
-    doc_y_concat = tf.reshape(doc_y, shape=[BS, -1])    # [1000, 2400]
+    doc_y_concat = tf.reshape(doc_y, shape=[FLAGS.batch_size, -1])    # [1000, 2400]
     print("doc_y_concat shape is %s" % doc_y_concat.get_shape())
     query_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True)), [1, FLAGS.negative_size])    # [1000, 20]
     print("query_norm shape is %s" % query_norm.get_shape())
     doc_norm = tf.squeeze(tf.sqrt(tf.reduce_sum(tf.square(doc_y), 2, True)))    # [1000, 20]
     print("doc_norm shape is %s" % doc_norm.get_shape())
     print("tf.multiply(query_y_tile, doc_y_concat) shape is %s" % tf.multiply(query_y_tile, doc_y_concat).get_shape())
-    prod = tf.reduce_sum(tf.reshape(tf.multiply(query_y_tile, doc_y_concat), shape=[BS, FLAGS.negative_size, -1]), 2)    # [1000, 20]
+    prod = tf.reduce_sum(tf.reshape(tf.multiply(query_y_tile, doc_y_concat), shape=[FLAGS.batch_size, FLAGS.negative_size, -1]), 2)    # [1000, 20]
     print("prod shape is %s" % prod.get_shape())
     norm_prod = tf.multiply(query_norm, doc_norm)    # [1000, 20]
     print("norm_prod shape is %s" % norm_prod.get_shape())
 
     cos_sim_raw = tf.truediv(prod, norm_prod)    # [1000, 20]
     print("cos_sim_raw shape is %s" % cos_sim_raw.get_shape())
-    cos_sim = tf.transpose(tf.reshape(tf.transpose(cos_sim_raw), [FLAGS.negative_size, BS])) * 20    # 20 is \gamma, [1000, 20]
+    cos_sim = tf.transpose(tf.reshape(tf.transpose(cos_sim_raw), [FLAGS.negative_size, FLAGS.batch_size])) * 20    # 20 is \gamma, [1000, 20]
     print("cos_sim shape is %s" % cos_sim.get_shape())
 
 with tf.name_scope('Loss'):
@@ -294,7 +281,7 @@ with tf.name_scope('Loss'):
     print("prob shape is %s" % prob.get_shape())
     hit_prob = tf.slice(prob, [0, 0], [-1, 1])    # [1000, 1]
     print("hit_prob shape is %s" % hit_prob.get_shape())
-    loss = -tf.reduce_sum(tf.log(hit_prob)) / BS
+    loss = -tf.reduce_sum(tf.log(hit_prob)) / FLAGS.batch_size
     tf.summary.scalar('loss', loss)
 
 with tf.name_scope('Training'):
@@ -312,28 +299,31 @@ with tf.name_scope('Test'):
     average_loss = tf.placeholder(tf.float32)
     loss_summary = tf.summary.scalar('average_loss', average_loss)
 
-def pull_batch(user_indices, user_values, doc_indices, doc_values, batch_idx):
+def pull_batch(batch_idx):
     # start = time.time()
-    lower_bound = batch_idx * BS
-    upper_bound = (batch_idx + 1) * BS
+    lower_bound = batch_idx * FLAGS.batch_size
+    upper_bound = (batch_idx + 1) * FLAGS.batch_size
     batch_indice_list = []
     batch_value_list = []
     for index, item in enumerate(user_indices):
         if item[0] >= lower_bound and item[0] < upper_bound:
-            item[0] %= BS
-            batch_indice_list.append(item)
+            offset_item = item[:]
+            offset_item[0] %= FLAGS.batch_size
+            batch_indice_list.append(offset_item)
             batch_value_list.append(user_values[index])
-    print(batch_indice_list)
-    query_in = tf.SparseTensorValue(np.array(batch_indice_list), np.array(batch_value_list), query_in_shape)
+    query_in = tf.SparseTensorValue(np.array(batch_indice_list, dtype=np.int64),
+                                    np.array(batch_value_list, dtype=np.float), query_in_shape)
 
     batch_indice_list = []
     batch_value_list = []
     for index, item in enumerate(doc_indices):
         if item[0] >= lower_bound and item[0] < upper_bound:
-            item[0] %= BS
-            batch_indice_list.append(item)
+            offset_item = item[:]
+            offset_item[0] %= FLAGS.batch_size
+            batch_indice_list.append(offset_item)
             batch_value_list.append(doc_values[index])
-    doc_in = tf.SparseTensorValue(np.array(batch_indice_list), np.array(batch_value_list), doc_in_shape)
+    doc_in = tf.SparseTensorValue(np.array(batch_indice_list, dtype=np.int64),
+                                  np.array(batch_value_list, dtype=np.float), doc_in_shape)
 
     # end = time.time()
     # print("Pull_batch time: %f" % (end - start))
@@ -341,11 +331,10 @@ def pull_batch(user_indices, user_values, doc_indices, doc_values, batch_idx):
     return query_in, doc_in
 
 
-def feed_dict(user_indices, user_values, doc_indices, doc_values, batch_idx):
+def feed_dict(batch_idx):
     """Make a TensorFlow feed_dict: maps data onto Tensor placeholders."""
-    query_in, doc_in = pull_batch(user_indices, user_values, doc_indices, doc_values, batch_idx)
+    query_in, doc_in = pull_batch(batch_idx)
     return {query_batch: query_in, doc_batch: doc_in}
-
 
 config = tf.ConfigProto()  # log_device_placement=True)
 config.gpu_options.allow_growth = True
@@ -364,7 +353,7 @@ with tf.Session(config=config) as sess:
 
     '''
     sample_size = query_samples.shape[0]
-    r = random.sample(range(sample_size), int((sample_size / BS * FLAGS.train_set_ratio) * BS))
+    r = random.sample(range(sample_size), int((sample_size / FLAGS.batch_size * FLAGS.train_set_ratio) * FLAGS.batch_size))
     test_r = np.setdiff1d(range(sample_size), r)
     query_train = query_samples[r]
     train_set_size = query_train.shape[0]
@@ -373,6 +362,15 @@ with tf.Session(config=config) as sess:
     doc_test = doc_samples[test_r]
     '''
 
+    for epoch_step in range(FLAGS.epoch_size):
+        for iter in range(FLAGS.iteration):
+            train_idx = iter % (len(train_index_list) + len(test_index_list))
+            if train_idx in train_index_list:
+                _, iter_loss = sess.run([train_step, loss],
+                         feed_dict=feed_dict(train_idx))
+                print("loss is %f" % iter_loss)
+
+    '''
     for step in range(FLAGS.max_steps):
         batch_idx = step % FLAGS.epoch_steps
         #if batch_idx % FLAGS.pack_size == 0:
@@ -396,27 +394,11 @@ with tf.Session(config=config) as sess:
         # #print(t2-t1)
         # t1 = time.time()
 
-        lower_bound = batch_idx * BS
-        upper_bound = (batch_idx + 1) * BS
-        batch_indice_list = []
-        batch_value_list = []
-        for index, item in enumerate(user_indices):
-            if item[0] >= lower_bound and item[0] < upper_bound:
-                item[0] %= BS
-                batch_indice_list.append(item)
-                batch_value_list.append(user_values[index])
-        query_in = tf.SparseTensorValue(np.array(batch_indice_list, dtype=np.int64), np.array(batch_value_list, dtype=np.float), query_in_shape)
-
-        batch_indice_list = []
-        batch_value_list = []
-        for index, item in enumerate(doc_indices):
-            if item[0] >= lower_bound and item[0] < upper_bound:
-                item[0] %= BS
-                batch_indice_list.append(item)
-                batch_value_list.append(doc_values[index])
-        doc_in = tf.SparseTensorValue(np.array(batch_indice_list), np.array(batch_value_list), doc_in_shape)
-        sess.run(train_step,
-                 feed_dict={query_batch: query_in, doc_batch: doc_in})
+        try:
+            sess.run(train_step, feed_dict=feed_dict(user_indices_train, user_values_train, doc_indices_train, doc_values_train, batch_idx))
+            print("train complete")
+        except:
+            pass
 
         # sess.run(train_step, feed_dict=feed_dict(user_indices, user_values, doc_indices, doc_values, batch_idx % FLAGS.pack_size))
         # t2 = time.time()
@@ -457,3 +439,4 @@ with tf.Session(config=config) as sess:
             start = time.time()
             print ("Epoch #%-5d | Test  Loss: %-4.3f | Calc_LossTime: %-3.3fs" %
                    (step / FLAGS.epoch_steps, epoch_loss, start - end))
+    '''
