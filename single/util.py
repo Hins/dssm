@@ -7,10 +7,7 @@ import random
 import numpy as np
 from config import cfg
 
-def load_samples(file_path):
-    placeholder = "none_xtpan"
-    separator = "###"
-
+def load_samples(file_path, dict_output_file):
     input_file = open(file_path, 'r')
 
     bigram_dict = {}
@@ -26,13 +23,13 @@ def load_samples(file_path):
         user_query_len = len(user_query_list)
         for index,word in enumerate(user_query_list):
             if index + 1 < user_query_len:
-                key = word + separator + user_query_list[index + 1]
+                key = word + cfg.separator + user_query_list[index + 1]
                 if key not in bigram_count:
                     bigram_count[key] = 1
                 else:
                     bigram_count[key] += 1
             else:
-                key = word + separator + placeholder
+                key = word + cfg.separator + cfg.placeholder
                 if key not in bigram_count:
                     bigram_count[key] = 1
                 else:
@@ -46,13 +43,13 @@ def load_samples(file_path):
 
             for index, word in enumerate(document):
                 if index + 1 < document_len:
-                    key = word + separator + document[index + 1]
+                    key = word + cfg.separator + document[index + 1]
                     if key not in bigram_count:
                         bigram_count[key] = 1
                     else:
                         bigram_count[key] += 1
                 else:
-                    key = word + separator + placeholder
+                    key = word + cfg.separator + cfg.placeholder
                     if key not in bigram_count:
                         bigram_count[key] = 1
                     else:
@@ -76,14 +73,14 @@ def load_samples(file_path):
         query_value_list = []
         for index,word in enumerate(user_query_list):
             if index + 1 < user_query_len:
-                key = word + separator + user_query_list[index + 1]
+                key = word + cfg.separator + user_query_list[index + 1]
                 #if bigram_count[key] > 5:
                 if key not in bigram_dict:
                     bigram_dict[key] = len(bigram_dict) + 1
                 query_indice_list.append([line_index, bigram_dict[key]])
                 query_value_list.append(1.0)
             else:
-                key = word + separator + placeholder
+                key = word + cfg.separator + cfg.placeholder
                 #if trigram_count[key] > 5:
                 if key not in bigram_dict:
                     bigram_dict[key] = len(bigram_dict) + 1
@@ -103,15 +100,15 @@ def load_samples(file_path):
 
             prev_size = len(doc_indice_list)
             for index, word in enumerate(document):
-                if index + 2 < document_len:
-                    key = word + separator + document[index + 1] + separator + document[index + 2]
+                if index + 1 < document_len:
+                    key = word + cfg.separator + document[index + 1]
                     #if trigram_count[key] > 5:
                     if key not in bigram_dict:
                         bigram_dict[key] = len(bigram_dict) + 1
                     doc_indice_list.append([line_index, index, bigram_dict[key]])
                     doc_value_list.append(1.0)
                 else:
-                    key = word + separator + placeholder
+                    key = word + cfg.separator + cfg.placeholder
                     #if trigram_count[key] > 5:
                     if key not in bigram_dict:
                         bigram_dict[key] = len(bigram_dict) + 1
@@ -127,6 +124,11 @@ def load_samples(file_path):
             doc_values.extend(doc_value_list)
 
     input_file.close()
+
+    output_file = open(dict_output_file, 'w')
+    for k,v in bigram_dict.items():
+        output_file.write(k.encode('utf-8') + "\t" + str(v) + "\n")
+    output_file.close()
 
     bigram_dict_size = len(bigram_dict) + 1
     print("bigram_dict_size is %d" % bigram_dict_size)

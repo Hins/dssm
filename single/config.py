@@ -17,6 +17,8 @@ flags.DEFINE_integer('epoch_size', 20, "Number of training epoch.")
 flags.DEFINE_integer('iteration', 10, "Number of training iteration.")
 flags.DEFINE_integer('l1_norm', 400, 'l1 normalization')
 flags.DEFINE_integer('l2_norm', 120, 'l2 normalization')
+flags.DEFINE_string('separator', '###', 'separator')
+flags.DEFINE_string('placeholder', 'none_xtpan', 'placeholder')
 flags.DEFINE_bool('gpu', 1, "Enable GPU or not")
 
 cfg = tf.app.flags.FLAGS

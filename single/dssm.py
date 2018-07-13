@@ -182,13 +182,13 @@ class DSSM:
         self.model.save(sess, self.output_file)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("dssm <input file> <output model>")
+    if len(sys.argv) < 4:
+        print("dssm <input file> <output dict file> <output model>")
         sys.exit()
 
     start = time.time()
     (user_indices, user_values, doc_indices, doc_values,
-     train_index_list, test_index_list, bigram_dict_size, sample_size) = load_samples(sys.argv[1])
+     train_index_list, test_index_list, bigram_dict_size, sample_size) = load_samples(sys.argv[1], sys.argv[2])
     print("batch: %d" % (sample_size / cfg.batch_size))
     end = time.time()
     print("Loading data from HDD to memory: %.2fs" % (end - start))
@@ -200,21 +200,21 @@ if __name__ == "__main__":
 
     with tf.Session(config=config) as sess:
         #sess.run(tf.global_variables_initializer())
-        dssm_obj = DSSM(sess, bigram_dict_size, sys.argv[2])
+        dssm_obj = DSSM(sess, bigram_dict_size, sys.argv[3])
         tf.global_variables_initializer().run()
         train_writer = tf.summary.FileWriter(cfg.summaries_dir + '/root/dssm/data/train', sess.graph)
         test_writer = tf.summary.FileWriter(cfg.summaries_dir + '/root/dssm/data/test', sess.graph)
 
-        if os.path.exists(sys.argv[1] + ".meta") == True:
-            dssm_model = tf.train.import_meta_graph(sys.argv[1] + '.meta')
-            dssm_model.restore(sess, sys.argv[1])
+        if os.path.exists(sys.argv[3] + ".meta") == True:
+            dssm_model = tf.train.import_meta_graph(sys.argv[3] + '.meta')
+            dssm_model.restore(sess, sys.argv[3])
 
             for epoch_step in range(cfg.epoch_size):
                 epoch_accuracy = 0.0
                 for iter in range(cfg.iteration):
                     test_idx = iter % (len(train_index_list) + len(test_index_list))
                     if test_idx in test_index_list:
-                        real_prob = dssm_obj.predict(test_idx)
+                        real_prob = dssm_model.predict(test_idx)
                         print(real_prob.shape)
             sys.exit()
 
