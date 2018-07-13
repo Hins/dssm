@@ -19,11 +19,11 @@ class DSSM:
         with tf.device('/gpu:0'):
             with tf.name_scope('input'):
                 # Shape [cfg.batch_size, TRIGRAM_D].
-                query_batch = tf.sparse_placeholder(tf.float32, shape=[None, self.dict_size], name='QueryBatch')
-                print("query_batch shape is %s" % query_batch.get_shape())    # [1000, BIGRAM_D]
+                self.query_batch = tf.sparse_placeholder(tf.float32, shape=[None, self.dict_size], name='QueryBatch')
+                print("query_batch shape is %s" % self.query_batch.get_shape())    # [1000, BIGRAM_D]
                 # Shape [cfg.batch_size, TRIGRAM_D]
-                doc_batch = tf.sparse_placeholder(tf.float32, shape=[None, cfg.negative_size, self.dict_size], name='DocBatch')
-                print("doc_batch shape is %s" % doc_batch.get_shape())    # [1000, 20, BIGRAM_D]
+                self.doc_batch = tf.sparse_placeholder(tf.float32, shape=[None, cfg.negative_size, self.dict_size], name='DocBatch')
+                print("doc_batch shape is %s" % self.doc_batch.get_shape())    # [1000, 20, BIGRAM_D]
 
         with tf.name_scope('L1'):
             l1_par_range = np.sqrt(6.0 / (self.dict_size + cfg.l1_norm))
@@ -33,9 +33,9 @@ class DSSM:
             self.variable_summaries(bias1, 'L1_biases')
 
             # query_l1 = tf.matmul(tf.to_float(query_batch),weight1)+bias1
-            query_l1 = tf.sparse_tensor_dense_matmul(query_batch, weight1) + bias1
+            query_l1 = tf.sparse_tensor_dense_matmul(self.query_batch, weight1) + bias1
             # doc_l1 = tf.matmul(tf.to_float(doc_batch),weight1)+bias1
-            doc_batches = tf.sparse_split(sp_input=doc_batch, num_split=cfg.negative_size, axis=1)
+            doc_batches = tf.sparse_split(sp_input=self.doc_batch, num_split=cfg.negative_size, axis=1)
             doc_l1_batch = []
             for doc in doc_batches:
                 doc_l1_batch.append(tf.sparse_tensor_dense_matmul(tf.sparse_reshape(doc, shape=[cfg.batch_size, self.dict_size]), weight1) + bias1)
@@ -101,7 +101,7 @@ class DSSM:
 
         with tf.name_scope('Training'):
             # Optimizer
-            train_step = tf.train.GradientDescentOptimizer(cfg.learning_rate).minimize(self.loss)
+            self.train_step = tf.train.GradientDescentOptimizer(cfg.learning_rate).minimize(self.loss)
 
         self.model = tf.train.Saver()
 
@@ -110,14 +110,14 @@ class DSSM:
             self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
         with tf.name_scope('Test'):
-            average_accuracy = tf.placeholder(tf.float32)
-            self.accuracy_summary = tf.summary.scalar('accuracy', average_accuracy)
+            self.average_accuracy = tf.placeholder(tf.float32)
+            self.accuracy_summary = tf.summary.scalar('accuracy', self.average_accuracy)
 
         merged = tf.summary.merge_all()
 
         with tf.name_scope('Train'):
-            average_loss = tf.placeholder(tf.float32)
-            self.loss_summary = tf.summary.scalar('average_loss', average_loss)
+            self.average_loss = tf.placeholder(tf.float32)
+            self.loss_summary = tf.summary.scalar('average_loss', self.average_loss)
 
     def variable_summaries(self, var, name):
         """Attach a lot of summaries to a Tensor."""
@@ -164,7 +164,7 @@ class DSSM:
         return {self.query_batch: query_in, self.doc_batch: doc_in}
 
     def train(self, train_idx):
-        return self.sess.run(self.loss, feed_dict=self.feed_dict(train_idx))
+        return self.sess.run([self.train_step, self.loss], feed_dict=self.feed_dict(train_idx))[1]
 
     def validate(self, test_idx):
         return self.sess.run(self.accuracy, feed_dict=self.feed_dict(test_idx))
@@ -172,11 +172,11 @@ class DSSM:
     def predict(self, idx):
         return self.sess.run(self.prob, feed_dict=self.feed_dict(idx))
 
-    def loss_summary(self, epoch_loss):
-        return self.sess.run(self.loss_summary, feed_dict={average_loss: epoch_loss})
+    def get_loss_summary(self, epoch_loss):
+        return self.sess.run(self.loss_summary, feed_dict={self.average_loss: epoch_loss})
 
-    def accuracy_summary(self, epoch_accuracy):
-        return self.sess.run(self.accuracy_summary, feed_dict={average_accuracy: epoch_accuracy})
+    def get_accuracy_summary(self, epoch_accuracy):
+        return self.sess.run(self.accuracy_summary, feed_dict={self.average_accuracy: epoch_accuracy})
 
     def save(self):
         self.model.save(sess, self.output_file)
@@ -199,8 +199,9 @@ if __name__ == "__main__":
     #config = tf.ConfigProto(device_count= {'GPU' : 0})
 
     with tf.Session(config=config) as sess:
-        sess.run(tf.global_variables_initializer())
+        #sess.run(tf.global_variables_initializer())
         dssm_obj = DSSM(sess, bigram_dict_size, sys.argv[2])
+        tf.global_variables_initializer().run()
         train_writer = tf.summary.FileWriter(cfg.summaries_dir + '/root/dssm/data/train', sess.graph)
         test_writer = tf.summary.FileWriter(cfg.summaries_dir + '/root/dssm/data/test', sess.graph)
 
@@ -227,7 +228,7 @@ if __name__ == "__main__":
                     print("epoch %d : iteration %d, loss is %f" % (epoch_step, iter, iter_loss))
                     epoch_loss += iter_loss
             epoch_loss /= len(train_index_list)
-            train_loss = dssm_obj.loss_summary(epoch_loss)
+            train_loss = dssm_obj.get_loss_summary(epoch_loss)
             train_writer.add_summary(train_loss, epoch_step + 1)
 
             epoch_accuracy = 0.0
@@ -238,7 +239,7 @@ if __name__ == "__main__":
                     print("epoch %d : iteration %d, accuracy is %f" % (epoch_step, iter, iter_accuracy))
                     epoch_accuracy += iter_accuracy
             epoch_accuracy /= len(test_index_list)
-            test_accuracy = dssm_obj.accuracy_summary(epoch_accuracy)
+            test_accuracy = dssm_obj.get_accuracy_summary(epoch_accuracy)
             test_writer.add_summary(test_accuracy, epoch_step + 1)
         dssm_obj.save()
         sess.close()
