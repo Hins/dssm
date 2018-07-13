@@ -8,7 +8,6 @@ import tensorflow as tf
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('file_path', '/root/dssm/data/wb.dat', 'sample files')
 flags.DEFINE_integer('batch_size', 100, 'train/test batch size')
 flags.DEFINE_float('train_set_ratio', 0.7, 'train set ratio')
 flags.DEFINE_string('summaries_dir', '/root/dssm/data/dssm-400-120-relu', 'Summaries directory')

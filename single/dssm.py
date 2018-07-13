@@ -188,7 +188,7 @@ if __name__ == "__main__":
 
     start = time.time()
     (user_indices, user_values, doc_indices, doc_values,
-     train_index_list, test_index_list, bigram_dict_size, sample_size) = load_samples(sys.argv[1], cfg.file_path)
+     train_index_list, test_index_list, bigram_dict_size, sample_size) = load_samples(sys.argv[1])
     print("batch: %d" % (sample_size / cfg.batch_size))
     end = time.time()
     print("Loading data from HDD to memory: %.2fs" % (end - start))
