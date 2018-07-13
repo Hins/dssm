@@ -127,7 +127,7 @@ def load_samples(file_path, dict_output_file):
 
     output_file = open(dict_output_file, 'w')
     for k,v in bigram_dict.items():
-        output_file.write(k.encode('utf-8') + "\t" + str(v) + "\n")
+        output_file.write(k.decode('utf-8') + "\t" + str(v) + "\n")
     output_file.close()
 
     bigram_dict_size = len(bigram_dict) + 1
