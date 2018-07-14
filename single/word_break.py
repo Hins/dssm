@@ -22,8 +22,8 @@ if __name__ == "__main__":
         input_file.close()
     print(len(stopword_dict))
 
-    float_digit_pattern = r"-?([1-9]\d*\.\d*|0\.\d*[1-9]\d*|0?\.0+|0)$"
-    integ_digit_pattern = r"-?[1-9]\d*"
+    float_digit_pattern = re.compile(r"-?([1-9]\d*\.\d*|0\.\d*[1-9]\d*|0?\.0+|0)$")
+    integ_digit_pattern = re.compile(r"-?[1-9]\d*")
 
     with open(sys.argv[4], 'w') as output_file:
         with open(sys.argv[3], 'r') as input_file:
@@ -36,8 +36,8 @@ if __name__ == "__main__":
                 word_list = [item.encode('utf-8') for item in word_list if
                              item.encode('utf-8') not in stopword_dict and
                              item.encode('utf-8').find(" ") == -1 and
-                             re.fullmatch(float_digit_pattern, item.encode("utf-8")) == None and
-                             re.fullmatch(integ_digit_pattern, item.encode("utf-8")) == None]
+                             float_digit_pattern.match(item.encode("utf-8")) == None and
+                             integ_digit_pattern.match(item.encode("utf-8")) == None]
                 if len(word_list) == 0:
                     continue
                 query = (',').join([item for item in word_list])
@@ -51,8 +51,8 @@ if __name__ == "__main__":
                     word_list = [item.encode('utf-8') for item in word_list if
                                  item.encode('utf-8') not in stopword_dict and
                                  item.encode('utf-8').find(" ") == -1 and
-                                 re.fullmatch(float_digit_pattern, item.encode("utf-8")) == None and
-                                 re.fullmatch(integ_digit_pattern, item.encode("utf-8")) == None]
+                                 float_digit_pattern.match(item.encode("utf-8")) == None and
+                                 integ_digit_pattern.match(item.encode("utf-8")) == None]
                     if len(word_list) == 0:
                         flag = True
                         break
