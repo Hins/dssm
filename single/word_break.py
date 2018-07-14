@@ -5,6 +5,7 @@
 
 import jieba
 import sys
+import re
 
 if __name__ == "__main__":
     if len(sys.argv) < 5:
@@ -21,6 +22,9 @@ if __name__ == "__main__":
         input_file.close()
     print(len(stopword_dict))
 
+    float_digit_pattern = r"-?([1-9]\d*\.\d*|0\.\d*[1-9]\d*|0?\.0+|0)$"
+    integ_digit_pattern = r"-?[1-9]\d*"
+
     with open(sys.argv[4], 'w') as output_file:
         with open(sys.argv[3], 'r') as input_file:
             for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
@@ -29,7 +33,11 @@ if __name__ == "__main__":
                     continue
                 query = elements[0]
                 word_list = jieba.cut(query, cut_all=False)
-                word_list = [item.encode('utf-8') for item in word_list if item.encode('utf-8') not in stopword_dict]
+                word_list = [item.encode('utf-8') for item in word_list if
+                             item.encode('utf-8') not in stopword_dict and
+                             item.encode('utf-8').find(" ") == -1 and
+                             re.fullmatch(float_digit_pattern, item.encode("utf-8")) == None and
+                             re.fullmatch(integ_digit_pattern, item.encode("utf-8")) == None]
                 if len(word_list) == 0:
                     continue
                 query = (',').join([item for item in word_list])
@@ -41,7 +49,10 @@ if __name__ == "__main__":
                     document = document_level[0]
                     word_list = jieba.cut(document, cut_all=False)
                     word_list = [item.encode('utf-8') for item in word_list if
-                                 item.encode('utf-8') not in stopword_dict]
+                                 item.encode('utf-8') not in stopword_dict and
+                                 item.encode('utf-8').find(" ") == -1 and
+                                 re.fullmatch(float_digit_pattern, item.encode("utf-8")) == None and
+                                 re.fullmatch(integ_digit_pattern, item.encode("utf-8")) == None]
                     if len(word_list) == 0:
                         flag = True
                         break
