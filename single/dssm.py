@@ -113,8 +113,6 @@ class DSSM:
             self.average_accuracy = tf.placeholder(tf.float32)
             self.accuracy_summary = tf.summary.scalar('accuracy', self.average_accuracy)
 
-        merged = tf.summary.merge_all()
-
         with tf.name_scope('Train'):
             self.average_loss = tf.placeholder(tf.float32)
             self.loss_summary = tf.summary.scalar('average_loss', self.average_loss)
@@ -162,6 +160,10 @@ class DSSM:
         """Make a TensorFlow feed_dict: maps data onto Tensor placeholders."""
         query_in, doc_in = self.pull_batch(batch_idx)
         return {self.query_batch: query_in, self.doc_batch: doc_in}
+
+    def print_parameter(self):
+        self.merged = tf.summary.merge_all()
+        return self.sess.run(self.merged, feed_dict={})
 
     def train(self, train_idx):
         return self.sess.run([self.train_step, self.loss], feed_dict=self.feed_dict(train_idx))[1]
@@ -230,6 +232,8 @@ if __name__ == "__main__":
             epoch_loss /= len(train_index_list)
             train_loss = dssm_obj.get_loss_summary(epoch_loss)
             train_writer.add_summary(train_loss, epoch_step + 1)
+            variable_summary = dssm_obj.print_parameter()
+            train_writer.add_summary(variable_summary, epoch_step + 1)
 
             epoch_accuracy = 0.0
             for iter in range(iteration):

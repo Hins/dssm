@@ -3,9 +3,17 @@
 # @Author      : panxiaotong
 # @Description : 通用函数库
 
+import sys
 import random
 import numpy as np
 from config import cfg
+
+'''
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("extract_training_sample <input_file_path> <dict_>")
+        sys.exit()
+'''
 
 def load_samples(file_path, dict_output_file):
     input_file = open(file_path, 'r')
