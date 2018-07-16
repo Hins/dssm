@@ -244,13 +244,12 @@ if __name__ == "__main__":
         #sess.run(tf.global_variables_initializer())
         dssm_obj = DSSM(sess, bigram_dict_size, cfg.dssm_model_path)
         tf.global_variables_initializer().run()
-        train_writer = tf.summary.FileWriter(cfg.summaries_dir + '/root/dssm/data/train', sess.graph)
-        test_writer = tf.summary.FileWriter(cfg.summaries_dir + '/root/dssm/data/test', sess.graph)
+        train_writer = tf.summary.FileWriter(cfg.summaries_dir + cfg.train_summary_writer_path, sess.graph)
+        test_writer = tf.summary.FileWriter(cfg.summaries_dir + cfg.test_summary_writer_path, sess.graph)
 
         if os.path.exists(cfg.dssm_model_path + ".meta") == True:
             dssm_model = tf.train.import_meta_graph(cfg.dssm_model_path + '.meta')
             dssm_model.restore(sess, cfg.dssm_model_path)
-
             for epoch_step in range(cfg.epoch_size):
                 epoch_accuracy = 0.0
                 for iter in range(cfg.iteration):

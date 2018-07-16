@@ -27,5 +27,7 @@ flags.DEFINE_string('query_indices_path', '/root/dssm/data/query_indices.dat', '
 flags.DEFINE_string('doc_indices_path', '/root/dssm/data/doc_indices.dat', 'doc indices path')
 flags.DEFINE_string('train_index_path', '/root/dssm/data/train_index.dat', 'train set index path')
 flags.DEFINE_string('dssm_model_path', '/root/dssm/model/dssm', 'dssm model path')
+flags.DEFINE_string('train_summary_writer_path', '/dssm/data/train', 'train summary writer path')
+flags.DEFINE_string('test_summary_writer_path', '/dssm/data/test', 'test summary writer path')
 
 cfg = tf.app.flags.FLAGS
