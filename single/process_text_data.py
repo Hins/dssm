@@ -124,11 +124,13 @@ if __name__ == "__main__":
                 flag = False
                 break
         if flag == True:
-            user_indices.extend(query_indice_list)
-            user_values.extend(query_value_list)
-            doc_indices.extend(doc_indice_list)
-            doc_values.extend(doc_value_list)
+            user_indices.append(query_indice_list)
+            user_values.append(query_value_list)
+            doc_indices.append(doc_indice_list)
+            doc_values.append(doc_value_list)
     input_file.close()
+
+    print(user_indices[0])
 
     output_file = open(sys.argv[2], 'w')
     for k,v in bigram_dict.items():
@@ -141,12 +143,19 @@ if __name__ == "__main__":
     bigram_dict_size = len(bigram_dict) + 1
     print("bigram_dict_size is %d" % bigram_dict_size)
 
+    user_indices_output_file = open(sys.argv[3], 'w')
     for item in user_indices:
+        user_indices_output_file.write("\001".join(str(sub_item[0]) + "\002" + str(sub_item[1]) for sub_item in item) + "\n")
+    user_indices_output_file.close()
 
+    doc_indices_output_file = open(sys.argv[4], 'w')
+    for item in doc_indices:
+        doc_indices_output_file.write("\001".join(str(sub_item[0]) + "\002" + str(sub_item[1]) for sub_item in item) + "\n")
+    doc_indices_output_file.close()
 
     sample_size = (line_index + 1) / cfg.batch_size
     print("sample_size is %d" % sample_size)
     train_index = random.sample(range(sample_size), int(sample_size * cfg.train_set_ratio))
+    np.savetxt(sys.argv[5], delimiter=",")
     test_index = np.setdiff1d(range(sample_size), train_index)
-
-    # return (user_indices, user_values, doc_indices, doc_values, train_index, test_index, bigram_dict_size, sample_size)
+    np.savetxt(sys.argv[6], delimiter=",")
