@@ -219,10 +219,14 @@ if __name__ == "__main__":
         for line in input_file:
             line = line.replace('\r', '').replace('\n', '').strip()
             elements = line.split("\001")
-            indices = []
-            for element in elements:
-                indices.append(element.split("\002"))
-            doc_indices.append(indices)
+            docs = []
+            for doc in elements:
+                indices_array = doc.split("\002")
+                indices_list = []
+                for indice in indices_array:
+                    indices_list.append(indice.split("\003"))
+                docs.append(indices_list)
+            doc_indices.append(docs)
         input_file.close()
 
     train_index_list = []
