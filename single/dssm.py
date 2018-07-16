@@ -184,10 +184,6 @@ class DSSM:
         self.model.save(sess, self.output_file)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("dssm <input file> <output dict file> <output model>")
-        sys.exit()
-
     start = time.time()
     with open(cfg.wb_file_path, 'r') as input_file:
         for index, line in enumerate(input_file):
@@ -246,14 +242,14 @@ if __name__ == "__main__":
 
     with tf.Session(config=config) as sess:
         #sess.run(tf.global_variables_initializer())
-        dssm_obj = DSSM(sess, bigram_dict_size, sys.argv[3])
+        dssm_obj = DSSM(sess, bigram_dict_size, cfg.dssm_model_path)
         tf.global_variables_initializer().run()
         train_writer = tf.summary.FileWriter(cfg.summaries_dir + '/root/dssm/data/train', sess.graph)
         test_writer = tf.summary.FileWriter(cfg.summaries_dir + '/root/dssm/data/test', sess.graph)
 
-        if os.path.exists(sys.argv[3] + ".meta") == True:
-            dssm_model = tf.train.import_meta_graph(sys.argv[3] + '.meta')
-            dssm_model.restore(sess, sys.argv[3])
+        if os.path.exists(cfg.dssm_model_path + ".meta") == True:
+            dssm_model = tf.train.import_meta_graph(cfg.dssm_model_path + '.meta')
+            dssm_model.restore(sess, cfg.dssm_model_path)
 
             for epoch_step in range(cfg.epoch_size):
                 epoch_accuracy = 0.0
