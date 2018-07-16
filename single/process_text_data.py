@@ -86,7 +86,7 @@ if __name__ == "__main__":
         documents = elements[1].split('\002')
         flag = True
         doc_indice_list = []
-        for document in documents:
+        for doc_index, document in enumerate(documents):
             sub_elements = document.split('\t')
             document = sub_elements[0].split(",")
             document_len = len(document)
@@ -98,13 +98,13 @@ if __name__ == "__main__":
                     #if trigram_count[key] > 5:
                     if key not in bigram_dict:
                         bigram_dict[key] = len(bigram_dict) + 1
-                    tmp_doc_indice_list.append([line_index, index, bigram_dict[key]])
+                    tmp_doc_indice_list.append([line_index, doc_index, bigram_dict[key]])
                 else:
                     key = word + cfg.separator + cfg.placeholder
                     #if trigram_count[key] > 5:
                     if key not in bigram_dict:
                         bigram_dict[key] = len(bigram_dict) + 1
-                    tmp_doc_indice_list.append([line_index, index, bigram_dict[key]])
+                    tmp_doc_indice_list.append([line_index, doc_index, bigram_dict[key]])
             if len(tmp_doc_indice_list) == 0:
                 flag = False
                 break
@@ -134,11 +134,11 @@ if __name__ == "__main__":
     for docs in doc_indices:   # item meant 20 docs
         doc_list = []
         for doc in docs:
-            doc_list.append("\002".join(str(indice[0]) + "\003" + str(indice[1]) for indice in doc))
+            doc_list.append("\002".join(str(indice[0]) + "\003" + str(indice[1]) + "\003" + str(indice[2]) for indice in doc))
         doc_indices_output_file.write("\001".join(doc_list) + "\n")
     doc_indices_output_file.close()
 
     sample_size = (line_index + 1) / cfg.batch_size
     print("sample_size is %d" % sample_size)
-    train_index = random.sample(range(sample_size), int(sample_size * cfg.train_set_ratio)).astype(np.int32)
+    train_index = random.sample(range(sample_size), int(sample_size * cfg.train_set_ratio))
     np.savetxt(cfg.train_index_path, train_index, delimiter=",")

@@ -6,7 +6,6 @@ import numpy as np
 import tensorflow as tf
 
 from config import cfg
-from util import load_samples
 
 class DSSM:
     def __init__(self, sess, dict_size, output_file):
@@ -134,23 +133,26 @@ class DSSM:
         upper_bound = (batch_idx + 1) * cfg.batch_size
         batch_indice_list = []
         batch_value_list = []
-        for index, item in enumerate(user_indices):
-            if item[0] >= lower_bound and item[0] < upper_bound:
-                offset_item = item[:]
-                offset_item[0] %= cfg.batch_size
-                batch_indice_list.append(offset_item)
-                batch_value_list.append(1)
+        for item in user_indices:
+            if item[0][0] >= lower_bound and item[0][0] < upper_bound:
+                for sub_item in item:
+                    offset_item = sub_item[:]
+                    offset_item[0] %= cfg.batch_size
+                    batch_indice_list.append(offset_item)
+                    batch_value_list.append(1)
         query_in = tf.SparseTensorValue(np.array(batch_indice_list, dtype=np.int64),
                                         np.array(batch_value_list, dtype=np.float32), self.query_in_shape)
 
         batch_indice_list = []
         batch_value_list = []
-        for index, item in enumerate(doc_indices):
-            if item[0] >= lower_bound and item[0] < upper_bound:
-                offset_item = item[:]
-                offset_item[0] %= cfg.batch_size
-                batch_indice_list.append(offset_item)
-                batch_value_list.append(1)
+        for doc in doc_indices:
+            if doc[0][0][0] >= lower_bound and doc[0][0][0] < upper_bound:
+                for indices in doc:
+                    for indice in indices:
+                        offset_item = indice[:]
+                        offset_item[0] %= cfg.batch_size
+                        batch_indice_list.append(offset_item)
+                        batch_value_list.append(1)
         doc_in = tf.SparseTensorValue(np.array(batch_indice_list, dtype=np.int64),
                                       np.array(batch_value_list, dtype=np.float32), self.doc_in_shape)
 
@@ -210,7 +212,7 @@ if __name__ == "__main__":
             elements = line.split("\001")
             indices = []
             for element in elements:
-                indices.append(element.split("\002"))
+                indices.append([int(indice) for indice in element.split("\002")])
             user_indices.append(indices)
         input_file.close()
 
@@ -224,18 +226,12 @@ if __name__ == "__main__":
                 indices_array = doc.split("\002")
                 indices_list = []
                 for indice in indices_array:
-                    indices_list.append(indice.split("\003"))
+                    indices_list.append([int(sub_indice) for sub_indice in indice.split("\003")])
                 docs.append(indices_list)
             doc_indices.append(docs)
         input_file.close()
 
-    train_index_list = []
-    with open(cfg.train_index_path, 'r') as input_file:
-        for line in input_file:
-            line = line.replace('\r', '').replace('\n', '').strip()
-            train_index_list = line.split(",")
-            break
-        input_file.close()
+    train_index_list = np.loadtxt(cfg.train_index_path, dtype=float).astype(int)
     end = time.time()
     print("Loading data from HDD to memory: %.2fs" % (end - start))
 
@@ -258,7 +254,7 @@ if __name__ == "__main__":
                 epoch_accuracy = 0.0
                 for iter in range(cfg.iteration):
                     test_idx = iter % (sample_size / cfg.batch_size)
-                    if test_idx not in train_index_list:
+                    if np.isin(test_idx, train_index_list) == False:
                         real_prob = dssm_model.predict(test_idx)
                         print(real_prob.shape)
             sys.exit()
@@ -268,7 +264,7 @@ if __name__ == "__main__":
             epoch_loss = 0.0
             for iter in range(iteration):
                 train_idx = iter % (sample_size / cfg.batch_size)
-                if train_idx in train_index_list:
+                if np.isin(train_idx, train_index_list) == True:
                     iter_loss = dssm_obj.train(train_idx)
                     print("epoch %d : iteration %d, loss is %f" % (epoch_step, iter, iter_loss))
                     epoch_loss += iter_loss
@@ -281,7 +277,7 @@ if __name__ == "__main__":
             epoch_accuracy = 0.0
             for iter in range(iteration):
                 test_idx = iter % (sample_size / cfg.batch_size)
-                if test_idx not in train_index_list:
+                if np.isin(test_idx, train_index_list) == False:
                     iter_accuracy = dssm_obj.validate(test_idx)
                     print("epoch %d : iteration %d, accuracy is %f" % (epoch_step, iter, iter_accuracy))
                     epoch_accuracy += iter_accuracy
