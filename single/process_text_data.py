@@ -140,5 +140,5 @@ if __name__ == "__main__":
 
     sample_size = (line_index + 1) / cfg.batch_size
     print("sample_size is %d" % sample_size)
-    train_index = random.sample(range(sample_size), int(sample_size * cfg.train_set_ratio))
+    train_index = random.sample(range(sample_size), int(sample_size * cfg.train_set_ratio)).astype(np.int32)
     np.savetxt(cfg.train_index_path, train_index, delimiter=",")
