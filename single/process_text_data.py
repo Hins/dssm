@@ -8,15 +8,13 @@ import random
 import numpy as np
 from config import cfg
 
-'''
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("extract_training_sample <input_file_path> <dict_>")
+    if len(sys.argv) < 7:
+        print("extract_training_sample <input_file_path> <dict_output_file> <user_indices_output_file> "
+              "<doc_indices_output_file> <train_indices_output_file> <test_indices_output_file>")
         sys.exit()
-'''
 
-def load_samples(file_path, dict_output_file):
-    input_file = open(file_path, 'r')
+    input_file = open(sys.argv[1], 'r')
 
     bigram_dict = {}
     bigram_count = {}
@@ -130,10 +128,9 @@ def load_samples(file_path, dict_output_file):
             user_values.extend(query_value_list)
             doc_indices.extend(doc_indice_list)
             doc_values.extend(doc_value_list)
-
     input_file.close()
 
-    output_file = open(dict_output_file, 'w')
+    output_file = open(sys.argv[2], 'w')
     for k,v in bigram_dict.items():
         try:
             output_file.write(k.decode('utf-8') + "\t" + str(v) + "\n")
@@ -144,9 +141,12 @@ def load_samples(file_path, dict_output_file):
     bigram_dict_size = len(bigram_dict) + 1
     print("bigram_dict_size is %d" % bigram_dict_size)
 
+    for item in user_indices:
+
+
     sample_size = (line_index + 1) / cfg.batch_size
     print("sample_size is %d" % sample_size)
     train_index = random.sample(range(sample_size), int(sample_size * cfg.train_set_ratio))
     test_index = np.setdiff1d(range(sample_size), train_index)
 
-    return (user_indices, user_values, doc_indices, doc_values, train_index, test_index, bigram_dict_size, sample_size)
+    # return (user_indices, user_values, doc_indices, doc_values, train_index, test_index, bigram_dict_size, sample_size)

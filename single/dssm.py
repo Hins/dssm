@@ -162,8 +162,8 @@ class DSSM:
         return {self.query_batch: query_in, self.doc_batch: doc_in}
 
     def print_parameter(self):
-        self.merged = tf.summary.merge_all()
-        return self.sess.run(self.merged, feed_dict={})
+        merged = tf.summary.merge_all()
+        return self.sess.run(merged, feed_dict={})
 
     def train(self, train_idx):
         return self.sess.run([self.train_step, self.loss], feed_dict=self.feed_dict(train_idx))[1]
