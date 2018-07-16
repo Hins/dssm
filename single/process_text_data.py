@@ -9,11 +9,9 @@ import numpy as np
 from config import cfg
 
 if __name__ == "__main__":
-    input_file = open(cfg.wb_file_path, 'r')
-
     bigram_dict = {}
     bigram_count = {}
-
+    input_file = open(cfg.wb_file_path, 'r')
     # calculate bigram count
     for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
         line = line.replace('\n', '').replace('\r', '')
@@ -149,4 +147,4 @@ if __name__ == "__main__":
     sample_size = (line_index + 1) / cfg.batch_size
     print("sample_size is %d" % sample_size)
     train_index = random.sample(range(sample_size), int(sample_size * cfg.train_set_ratio))
-    np.savetxt(cfg.train_index_path, delimiter=",")
+    np.savetxt(cfg.train_index_path, train_index, delimiter=",")

@@ -139,7 +139,7 @@ class DSSM:
                 offset_item = item[:]
                 offset_item[0] %= cfg.batch_size
                 batch_indice_list.append(offset_item)
-                batch_value_list.append(user_values[index])
+                batch_value_list.append(1)
         query_in = tf.SparseTensorValue(np.array(batch_indice_list, dtype=np.int64),
                                         np.array(batch_value_list, dtype=np.float32), self.query_in_shape)
 
@@ -150,7 +150,7 @@ class DSSM:
                 offset_item = item[:]
                 offset_item[0] %= cfg.batch_size
                 batch_indice_list.append(offset_item)
-                batch_value_list.append(doc_values[index])
+                batch_value_list.append(1)
         doc_in = tf.SparseTensorValue(np.array(batch_indice_list, dtype=np.int64),
                                       np.array(batch_value_list, dtype=np.float32), self.doc_in_shape)
 
@@ -189,9 +189,53 @@ if __name__ == "__main__":
         sys.exit()
 
     start = time.time()
-    (user_indices, user_values, doc_indices, doc_values,
-     train_index_list, test_index_list, bigram_dict_size, sample_size) = load_samples(sys.argv[1], sys.argv[2])
+    with open(cfg.wb_file_path, 'r') as input_file:
+        for index, line in enumerate(input_file):
+            pass
+        sample_size = index + 1
+        input_file.close()
     print("batch: %d" % (sample_size / cfg.batch_size))
+
+    words_dict = {}
+    with open(cfg.dict_file_path, 'r') as input_file:
+        for line in input_file:
+            line = line.replace('\r','').replace('\n','').strip()
+            elements = line.split("\t")
+            if len(elements) < 2:
+                continue
+            words_dict[elements[0]] = int(elements[1])
+        input_file.close()
+    bigram_dict_size = len(words_dict)
+
+    user_indices = []
+    with open(cfg.query_indices_path, 'r') as input_file:
+        for line in input_file:
+            line = line.replace('\r', '').replace('\n', '').strip()
+            elements = line.split("\001")
+            indices = []
+            for element in elements:
+                indices.append(element.split("\002"))
+            user_indices.append(indices)
+        input_file.close()
+
+    doc_indices = []
+    with open(cfg.doc_indices_path, 'r') as input_file:
+        for line in input_file:
+            line = line.replace('\r', '').replace('\n', '').strip()
+            elements = line.split("\001")
+            indices = []
+            for element in elements:
+                indices.append(element.split("\002"))
+            doc_indices.append(indices)
+        input_file.close()
+
+    train_index_list = []
+    with open(cfg.train_index_path, 'r') as input_file:
+        for line in input_file:
+            line = line.replace('\r', '').replace('\n', '').strip()
+            train_index_list = line.split(",")
+            break
+        input_file.close()
     end = time.time()
     print("Loading data from HDD to memory: %.2fs" % (end - start))
 
@@ -214,8 +258,8 @@ if __name__ == "__main__":
             for epoch_step in range(cfg.epoch_size):
                 epoch_accuracy = 0.0
                 for iter in range(cfg.iteration):
-                    test_idx = iter % (len(train_index_list) + len(test_index_list))
-                    if test_idx in test_index_list:
+                    test_idx = iter % (sample_size / cfg.batch_size)
+                    if test_idx not in train_index_list:
                         real_prob = dssm_model.predict(test_idx)
                         print(real_prob.shape)
             sys.exit()
@@ -224,7 +268,7 @@ if __name__ == "__main__":
         for epoch_step in range(cfg.epoch_size):
             epoch_loss = 0.0
             for iter in range(iteration):
-                train_idx = iter % (len(train_index_list) + len(test_index_list))
+                train_idx = iter % (sample_size / cfg.batch_size)
                 if train_idx in train_index_list:
                     iter_loss = dssm_obj.train(train_idx)
                     print("epoch %d : iteration %d, loss is %f" % (epoch_step, iter, iter_loss))
@@ -237,12 +281,12 @@ if __name__ == "__main__":
 
             epoch_accuracy = 0.0
             for iter in range(iteration):
-                test_idx = iter % (len(train_index_list) + len(test_index_list))
-                if test_idx in test_index_list:
+                test_idx = iter % (sample_size / cfg.batch_size)
+                if test_idx not in train_index_list:
                     iter_accuracy = dssm_obj.validate(test_idx)
                     print("epoch %d : iteration %d, accuracy is %f" % (epoch_step, iter, iter_accuracy))
                     epoch_accuracy += iter_accuracy
-            epoch_accuracy /= len(test_index_list)
+            epoch_accuracy /= len(sample_size / cfg.batch_size - len(train_index_list))
             test_accuracy = dssm_obj.get_accuracy_summary(epoch_accuracy)
             test_writer.add_summary(test_accuracy, epoch_step + 1)
         dssm_obj.save()
