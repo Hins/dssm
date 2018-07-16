@@ -10,7 +10,6 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_integer('batch_size', 100, 'train/test batch size')
 flags.DEFINE_float('train_set_ratio', 0.7, 'train set ratio')
-flags.DEFINE_string('summaries_dir', '/root/dssm/data/dssm-400-120-relu', 'Summaries directory')
 flags.DEFINE_float('learning_rate', 0.1, 'Initial learning rate.')
 flags.DEFINE_integer('negative_size', 60, 'negative size')
 flags.DEFINE_integer('epoch_size', 20, "Number of training epoch.")
@@ -20,5 +19,12 @@ flags.DEFINE_integer('l2_norm', 120, 'l2 normalization')
 flags.DEFINE_string('separator', '###', 'separator')
 flags.DEFINE_string('placeholder', 'none_xtpan', 'placeholder')
 flags.DEFINE_bool('gpu', 1, "Enable GPU or not")
+
+flags.DEFINE_string('summaries_dir', '/root/dssm/data/dssm-400-120-relu', 'Summaries directory')
+flags.DEFINE_string('wb_file_path', '/root/dssm/data/wb.dat', 'word break file path')
+flags.DEFINE_string('dict_file_path', '/root/dssm/data/dict.dat', 'dictionary file')
+flags.DEFINE_string('query_indices_path', '/root/dssm/data/query_indices.dat', 'query indices path')
+flags.DEFINE_string('doc_indices_path', '/root/dssm/data/doc_indices.dat', 'doc indices path')
+flags.DEFINE_string('train_index_path', '/root/dssm/data/train_index.dat', 'train set index path')
 
 cfg = tf.app.flags.FLAGS
