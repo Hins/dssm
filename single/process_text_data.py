@@ -9,11 +9,6 @@ import numpy as np
 from config import cfg
 
 if __name__ == "__main__":
-    if len(sys.argv) < 7:
-        print("extract_training_sample <input_file_path> <dict_output_file> <user_indices_output_file> "
-              "<doc_indices_output_file> <train_indices_output_file> <test_indices_output_file>")
-        sys.exit()
-
     input_file = open(cfg.wb_file_path, 'r')
 
     bigram_dict = {}
