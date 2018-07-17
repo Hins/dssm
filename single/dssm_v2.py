@@ -6,145 +6,7 @@ import numpy as np
 import tensorflow as tf
 
 from config import cfg
-
-def load_samples():
-    bigram_dict = {}
-    bigram_count = {}
-    input_file = open(cfg.wb_file_path, 'r')
-    # calculate bigram count
-    for line in input_file:  # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
-        line = line.replace('\n', '').replace('\r', '')
-        elements = line.split('\001')
-        if len(elements) < 2:
-            continue
-        user_query_list = elements[0].split(",")
-        user_query_len = len(user_query_list)
-        for index, word in enumerate(user_query_list):
-            if index + 1 < user_query_len:
-                key = word + cfg.separator + user_query_list[index + 1]
-                if key not in bigram_count:
-                    bigram_count[key] = 1
-                else:
-                    bigram_count[key] += 1
-            else:
-                key = word + cfg.separator + cfg.placeholder
-                if key not in bigram_count:
-                    bigram_count[key] = 1
-                else:
-                    bigram_count[key] += 1
-
-        documents = elements[1].split('\002')
-        for document in documents:
-            sub_elements = document.split('\t')
-            document = sub_elements[0].split(",")
-            document_len = len(document)
-
-            for index, word in enumerate(document):
-                if index + 1 < document_len:
-                    key = word + cfg.separator + document[index + 1]
-                    if key not in bigram_count:
-                        bigram_count[key] = 1
-                    else:
-                        bigram_count[key] += 1
-                else:
-                    key = word + cfg.separator + cfg.placeholder
-                    if key not in bigram_count:
-                        bigram_count[key] = 1
-                    else:
-                        bigram_count[key] += 1
-    input_file.seek(0)
-
-    print("calculate bigram count complete")
-
-    user_indices = []
-    doc_indices = []
-    for line_index, line in enumerate(input_file):  # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
-        line = line.replace('\n', '').replace('\r', '')
-        elements = line.split('\001')
-        if len(elements) < 2:
-            continue
-        user_query_list = elements[0].split(",")
-        user_query_len = len(user_query_list)
-        query_indice_list = []
-        for index, word in enumerate(user_query_list):
-            if index + 1 < user_query_len:
-                key = word + cfg.separator + user_query_list[index + 1]
-                # if bigram_count[key] > 5:
-                if key not in bigram_dict:
-                    bigram_dict[key] = len(bigram_dict) + 1
-                query_indice_list.append([line_index, bigram_dict[key]])
-            else:
-                key = word + cfg.separator + cfg.placeholder
-                # if trigram_count[key] > 5:
-                if key not in bigram_dict:
-                    bigram_dict[key] = len(bigram_dict) + 1
-                query_indice_list.append([line_index, bigram_dict[key]])
-        if len(query_indice_list) == 0:
-            continue
-
-        documents = elements[1].split('\002')
-        flag = True
-        doc_indice_list = []
-        for doc_index, document in enumerate(documents):
-            sub_elements = document.split('\t')
-            document = sub_elements[0].split(",")
-            document_len = len(document)
-
-            tmp_doc_indice_list = []
-            for index, word in enumerate(document):
-                if index + 1 < document_len:
-                    key = word + cfg.separator + document[index + 1]
-                    # if trigram_count[key] > 5:
-                    if key not in bigram_dict:
-                        bigram_dict[key] = len(bigram_dict) + 1
-                    tmp_doc_indice_list.append([line_index, doc_index, bigram_dict[key]])
-                else:
-                    key = word + cfg.separator + cfg.placeholder
-                    # if trigram_count[key] > 5:
-                    if key not in bigram_dict:
-                        bigram_dict[key] = len(bigram_dict) + 1
-                    tmp_doc_indice_list.append([line_index, doc_index, bigram_dict[key]])
-            if len(tmp_doc_indice_list) == 0:
-                flag = False
-                break
-            doc_indice_list.append(tmp_doc_indice_list)
-        if flag == True:
-            user_indices.append(query_indice_list)
-            doc_indices.append(doc_indice_list)
-    input_file.close()
-
-    output_file = open(cfg.dict_file_path, 'w')
-    for k, v in bigram_dict.items():
-        try:
-            output_file.write(k.decode('utf-8') + "\t" + str(v) + "\n")
-        except:
-            output_file.write(k + "\t" + str(v) + "\n")
-    output_file.close()
-
-    bigram_dict_size = len(bigram_dict) + 1
-    print("bigram_dict_size is %d" % bigram_dict_size)
-
-    user_indices_output_file = open(cfg.query_indices_path, 'w')
-    for item in user_indices:
-        user_indices_output_file.write(
-            "\001".join(str(sub_item[0]) + "\002" + str(sub_item[1]) for sub_item in item) + "\n")
-    user_indices_output_file.close()
-
-    doc_indices_output_file = open(cfg.doc_indices_path, 'w')
-    for docs in doc_indices:  # item meant 20 docs
-        doc_list = []
-        for doc in docs:
-            doc_list.append(
-                "\002".join(str(indice[0]) + "\003" + str(indice[1]) + "\003" + str(indice[2]) for indice in doc))
-        doc_indices_output_file.write("\001".join(doc_list) + "\n")
-    doc_indices_output_file.close()
-
-    sample_size = (line_index + 1) / cfg.batch_size
-    print("sample_size is %d" % sample_size)
-    train_index = random.sample(range(sample_size), int(sample_size * cfg.train_set_ratio))
-
-    return (user_indices, doc_indices, train_index, bigram_dict_size, sample_size)
-
+from util import load_samples
 
 class DSSM:
     def __init__(self, sess, dict_size, output_file):
@@ -273,25 +135,22 @@ class DSSM:
         batch_indice_list = []
         batch_value_list = []
         for index, item in enumerate(user_indices):
-            if item[0][0] >= lower_bound and item[0][0] < upper_bound:
-                for sub_item in item:
-                    offset_item = sub_item[:]
-                    offset_item[0] %= cfg.batch_size
-                    batch_indice_list.append(offset_item)
-                    batch_value_list.append(1)
+            if item[0] >= lower_bound and item[0] < upper_bound:
+                offset_item = item[:]
+                offset_item[0] %= cfg.batch_size
+                batch_indice_list.append(offset_item)
+                batch_value_list.append(user_values[index])
         query_in = tf.SparseTensorValue(np.array(batch_indice_list, dtype=np.int64),
                                         np.array(batch_value_list, dtype=np.float32), self.query_in_shape)
 
         batch_indice_list = []
         batch_value_list = []
         for index, item in enumerate(doc_indices):
-            if item[0][0][0] >= lower_bound and item[0][0][0] < upper_bound:
-                for indices in item:
-                    for indice in indices:
-                        offset_item = indice[:]
-                        offset_item[0] %= cfg.batch_size
-                        batch_indice_list.append(offset_item)
-                        batch_value_list.append(1)
+            if item[0] >= lower_bound and item[0] < upper_bound:
+                offset_item = item[:]
+                offset_item[0] %= cfg.batch_size
+                batch_indice_list.append(offset_item)
+                batch_value_list.append(doc_values[index])
         doc_in = tf.SparseTensorValue(np.array(batch_indice_list, dtype=np.int64),
                                       np.array(batch_value_list, dtype=np.float32), self.doc_in_shape)
 
@@ -325,8 +184,13 @@ class DSSM:
         self.model.save(sess, self.output_file)
 
 if __name__ == "__main__":
+    if len(sys.argv) < 4:
+        print("dssm <input file> <output dict file> <output model>")
+        sys.exit()
+
     start = time.time()
-    (user_indices, doc_indices, train_index_list, bigram_dict_size, sample_size) = load_samples()
+    (user_indices, user_values, doc_indices, doc_values,
+     train_index_list, test_index_list, bigram_dict_size, sample_size) = load_samples(sys.argv[1], sys.argv[2])
     print("batch: %d" % (sample_size / cfg.batch_size))
     end = time.time()
     print("Loading data from HDD to memory: %.2fs" % (end - start))
@@ -338,20 +202,20 @@ if __name__ == "__main__":
 
     with tf.Session(config=config) as sess:
         #sess.run(tf.global_variables_initializer())
-        dssm_obj = DSSM(sess, bigram_dict_size, cfg.dssm_model_path)
+        dssm_obj = DSSM(sess, bigram_dict_size, sys.argv[3])
         tf.global_variables_initializer().run()
         train_writer = tf.summary.FileWriter(cfg.summaries_dir + '/root/dssm/data/train', sess.graph)
         test_writer = tf.summary.FileWriter(cfg.summaries_dir + '/root/dssm/data/test', sess.graph)
 
-        if os.path.exists(cfg.dssm_model_path + ".meta") == True:
-            dssm_model = tf.train.import_meta_graph(cfg.dssm_model_path + '.meta')
-            dssm_model.restore(sess, cfg.dssm_model_path)
+        if os.path.exists(sys.argv[3] + ".meta") == True:
+            dssm_model = tf.train.import_meta_graph(sys.argv[3] + '.meta')
+            dssm_model.restore(sess, sys.argv[3])
 
             for epoch_step in range(cfg.epoch_size):
                 epoch_accuracy = 0.0
                 for iter in range(cfg.iteration):
-                    test_idx = iter % (sample_size / cfg.batch_size)
-                    if test_idx not in train_index_list:
+                    test_idx = iter % (len(train_index_list) + len(test_index_list))
+                    if test_idx in test_index_list:
                         real_prob = dssm_model.predict(test_idx)
                         print(real_prob.shape)
             sys.exit()
@@ -360,7 +224,7 @@ if __name__ == "__main__":
         for epoch_step in range(cfg.epoch_size):
             epoch_loss = 0.0
             for iter in range(iteration):
-                train_idx = iter % (sample_size / cfg.batch_size)
+                train_idx = iter % (len(train_index_list) + len(test_index_list))
                 if train_idx in train_index_list:
                     iter_loss = dssm_obj.train(train_idx)
                     print("epoch %d : iteration %d, loss is %f" % (epoch_step, iter, iter_loss))
@@ -373,12 +237,12 @@ if __name__ == "__main__":
 
             epoch_accuracy = 0.0
             for iter in range(iteration):
-                test_idx = iter % (sample_size / cfg.batch_size)
-                if test_idx not in train_index_list:
+                test_idx = iter % (len(train_index_list) + len(test_index_list))
+                if test_idx in test_index_list:
                     iter_accuracy = dssm_obj.validate(test_idx)
                     print("epoch %d : iteration %d, accuracy is %f" % (epoch_step, iter, iter_accuracy))
                     epoch_accuracy += iter_accuracy
-            epoch_accuracy /= (sample_size / cfg.batch_size - len(train_index_list))
+            epoch_accuracy /= len(test_index_list)
             test_accuracy = dssm_obj.get_accuracy_summary(epoch_accuracy)
             test_writer.add_summary(test_accuracy, epoch_step + 1)
         dssm_obj.save()
