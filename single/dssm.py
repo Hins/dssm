@@ -102,6 +102,7 @@ class DSSM:
             # Optimizer
             self.train_step = tf.train.GradientDescentOptimizer(cfg.learning_rate).minimize(self.loss)
 
+        self.merged = tf.summary.merge_all()
         self.model = tf.train.Saver()
 
         with tf.name_scope('Accuracy'):
@@ -163,12 +164,11 @@ class DSSM:
         query_in, doc_in = self.pull_batch(batch_idx)
         return {self.query_batch: query_in, self.doc_batch: doc_in}
 
-    def print_parameter(self):
-        merged = tf.summary.merge_all()
-        return self.sess.run(merged, feed_dict={})
-
-    def train(self, train_idx):
-        return self.sess.run([self.train_step, self.loss], feed_dict=self.feed_dict(train_idx))[1]
+    def train(self, train_idx, print_var=False):
+        if print_var == True:
+            return self.sess.run([self.train_step, self.merged, self.loss], feed_dict=self.feed_dict(train_idx))
+        else:
+            return self.sess.run([self.train_step, self.loss], feed_dict=self.feed_dict(train_idx))[1]
 
     def validate(self, test_idx):
         return self.sess.run(self.accuracy, feed_dict=self.feed_dict(test_idx))
@@ -247,6 +247,7 @@ if __name__ == "__main__":
         train_writer = tf.summary.FileWriter(cfg.summaries_dir + cfg.train_summary_writer_path, sess.graph)
         test_writer = tf.summary.FileWriter(cfg.summaries_dir + cfg.test_summary_writer_path, sess.graph)
 
+        # load previous model to predict
         if os.path.exists(cfg.dssm_model_path + ".meta") == True:
             dssm_model = tf.train.import_meta_graph(cfg.dssm_model_path + '.meta')
             dssm_model.restore(sess, cfg.dssm_model_path)
@@ -265,14 +266,16 @@ if __name__ == "__main__":
             for iter in range(iteration):
                 train_idx = iter % (sample_size / cfg.batch_size)
                 if np.isin(train_idx, train_index_list) == True:
-                    iter_loss = dssm_obj.train(train_idx)
+                    if iter % 100 == 0:
+                        _, merged, iter_loss = dssm_obj.train(train_idx, True)
+                        train_writer.add_summary(merged, iter * epoch_step)
+                    else:
+                        iter_loss = dssm_obj.train(train_idx)
                     print("epoch %d : iteration %d, loss is %f" % (epoch_step, iter, iter_loss))
                     epoch_loss += iter_loss
             epoch_loss /= len(train_index_list)
             train_loss = dssm_obj.get_loss_summary(epoch_loss)
             train_writer.add_summary(train_loss, epoch_step + 1)
-            variable_summary = dssm_obj.print_parameter()
-            train_writer.add_summary(variable_summary, epoch_step + 1)
 
             epoch_accuracy = 0.0
             for iter in range(iteration):
@@ -281,7 +284,7 @@ if __name__ == "__main__":
                     iter_accuracy = dssm_obj.validate(test_idx)
                     print("epoch %d : iteration %d, accuracy is %f" % (epoch_step, iter, iter_accuracy))
                     epoch_accuracy += iter_accuracy
-            epoch_accuracy /= len(sample_size / cfg.batch_size - len(train_index_list))
+            epoch_accuracy /= (sample_size / cfg.batch_size - len(train_index_list))
             test_accuracy = dssm_obj.get_accuracy_summary(epoch_accuracy)
             test_writer.add_summary(test_accuracy, epoch_step + 1)
         dssm_obj.save()
