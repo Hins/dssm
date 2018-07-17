@@ -9,9 +9,10 @@ import numpy as np
 from config import cfg
 
 if __name__ == "__main__":
-    bigram_dict = {}
-    bigram_count = {}
     input_file = open(cfg.wb_file_path, 'r')
+
+    '''
+    bigram_count = {}
     # calculate bigram count
     for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
         line = line.replace('\n', '').replace('\r', '')
@@ -54,9 +55,10 @@ if __name__ == "__main__":
                     else:
                         bigram_count[key] += 1
     input_file.seek(0)
-
     print("calculate bigram count complete")
+    '''
 
+    bigram_dict = {}
     user_indices = []
     doc_indices = []
     for line_index, line in enumerate(input_file):    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>

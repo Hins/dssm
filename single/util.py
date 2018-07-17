@@ -18,9 +18,8 @@ if __name__ == "__main__":
 def load_samples(file_path, dict_output_file):
     input_file = open(file_path, 'r')
 
-    bigram_dict = {}
+    '''
     bigram_count = {}
-
     # calculate bigram count
     for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
         line = line.replace('\n', '').replace('\r', '')
@@ -65,7 +64,9 @@ def load_samples(file_path, dict_output_file):
     input_file.seek(0)
 
     print("calculate bigram count complete")
+    '''
 
+    bigram_dict = {}
     user_indices = []
     user_values = []
     doc_indices = []
@@ -101,7 +102,7 @@ def load_samples(file_path, dict_output_file):
         flag = True
         doc_indice_list = []
         doc_value_list = []
-        for document in documents:
+        for doc_index, document in enumerate(documents):
             sub_elements = document.split('\t')
             document = sub_elements[0].split(",")
             document_len = len(document)
@@ -113,14 +114,14 @@ def load_samples(file_path, dict_output_file):
                     #if trigram_count[key] > 5:
                     if key not in bigram_dict:
                         bigram_dict[key] = len(bigram_dict) + 1
-                    doc_indice_list.append([line_index, index, bigram_dict[key]])
+                    doc_indice_list.append([line_index, doc_index, bigram_dict[key]])
                     doc_value_list.append(1.0)
                 else:
                     key = word + cfg.separator + cfg.placeholder
                     #if trigram_count[key] > 5:
                     if key not in bigram_dict:
                         bigram_dict[key] = len(bigram_dict) + 1
-                    doc_indice_list.append([line_index, index, bigram_dict[key]])
+                    doc_indice_list.append([line_index, doc_index, bigram_dict[key]])
                     doc_value_list.append(1.0)
             if prev_size == len(doc_indice_list):
                 flag = False

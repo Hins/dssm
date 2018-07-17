@@ -11,7 +11,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_integer('batch_size', 100, 'train/test batch size')
 flags.DEFINE_float('train_set_ratio', 0.7, 'train set ratio')
 flags.DEFINE_float('learning_rate', 0.1, 'Initial learning rate.')
-flags.DEFINE_integer('negative_size', 60, 'negative size')
+flags.DEFINE_integer('negative_size', 61, 'negative size')
 flags.DEFINE_integer('epoch_size', 20, "Number of training epoch.")
 flags.DEFINE_integer('iteration', 10, "Number of training iteration.")
 flags.DEFINE_integer('l1_norm', 400, 'l1 normalization')
