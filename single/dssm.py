@@ -91,7 +91,7 @@ class DSSM:
 
         with tf.name_scope('Loss'):
             # Train Loss
-            self.prob = tf.nn.softmax((cos_sim))    # [1000, 20]
+            self.prob = tf.nn.softmax((cos_sim), name="prob")    # [1000, 20]
             print("prob shape is %s" % self.prob.get_shape())
             hit_prob = tf.slice(self.prob, [0, 0], [-1, 1])    # [1000, 1]
             print("hit_prob shape is %s" % hit_prob.get_shape())

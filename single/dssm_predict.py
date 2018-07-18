@@ -92,7 +92,7 @@ if __name__ == "__main__":
     print(len(stopword_dict))
 
     bigram_dict = {}
-    with open(sys.argv[2], 'r') as input_file:
+    with open(sys.argv[4], 'r') as input_file:
         for line in input_file:
             line = line.replace('\r','').replace('\n','').strip()
             elements = line.split("\t")
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     user_query_list = []
     docs_list = []
 
-    with open(sys.argv[3], 'r') as input_file:
+    with open(sys.argv[5], 'r') as input_file:
         for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
             line = line.replace('\r', '').replace('\n', '').strip()
             elements = line.split("\001")
@@ -127,8 +127,8 @@ if __name__ == "__main__":
             dssm_model.restore(sess, sys.argv[1])
             graph = tf.get_default_graph()
             prob = graph.get_tensor_by_name("prob:0")
-            query_batch = graph.get_tensor_by_name("query_batch:0")
-            doc_batch = graph.get_tensor_by_name("doc_batch:0")
+            query_batch = graph.get_tensor_by_name("QueryBatch:0")
+            doc_batch = graph.get_tensor_by_name("DocBatch:0")
             for index,query in enumerate(user_query_list):
                 query_in, doc_in = get_sparse_input(query, docs_list[index], bigram_dict, query_in_shape, doc_in_shape)
                 real_prob = sess.run(prob, feed_dict={query_batch: query_in, doc_batch: doc_in})
