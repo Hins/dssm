@@ -93,10 +93,12 @@ class DSSM:
             # Train Loss
             self.prob = tf.nn.softmax((cos_sim), name="prob")    # [1000, 20]
             print("prob shape is %s" % self.prob.get_shape())
-            hit_prob = tf.slice(self.prob, [0, 0], [-1, 1])    # [1000, 1]
-            print("hit_prob shape is %s" % hit_prob.get_shape())
-            self.loss = -tf.reduce_sum(tf.log(hit_prob)) / cfg.batch_size
-            tf.summary.scalar('loss', self.loss)
+            pos_prob = tf.slice(self.prob, [0, 0], [-1, 1])    # [1000, 1]
+            print("pos_prob shape is %s" % pos_prob.get_shape())
+            print("tf.slice(self.prob, [0, 1], [-1, cfg.negative_size - 1]) shape is %s" % tf.slice(self.prob, [0, 1], [-1, cfg.negative_size - 1]).get_shape())
+            neg_prob = tf.reduce_sum(tf.slice(self.prob, [0, 1], [-1, cfg.negative_size - 1]), axis=1)    # [1000, 60]
+            print("neg_prob shape is %s" % neg_prob.get_shape())
+            self.loss = (-tf.reduce_sum(tf.log(pos_prob)) + tf.reduce_sum(tf.log(neg_prob))) / cfg.batch_size
 
         with tf.name_scope('Training'):
             # Optimizer
@@ -216,6 +218,7 @@ if __name__ == "__main__":
                 indices.append([int(indice) for indice in element.split("\002")])
             user_indices.append(indices)
         input_file.close()
+    print("load user_indices complete")
 
     doc_indices = []
     with open(cfg.doc_indices_path, 'r') as input_file:
@@ -231,8 +234,11 @@ if __name__ == "__main__":
                 docs.append(indices_list)
             doc_indices.append(docs)
         input_file.close()
+    print("load doc_indices complete")
 
     train_index_list = np.loadtxt(cfg.train_index_path, dtype=float).astype(int)
+    train_list_len = train_index_list.shape[0]
+    test_list_len = sample_size / cfg.batch_size - train_list_len
     end = time.time()
     print("Loading data from HDD to memory: %.2fs" % (end - start))
 
@@ -261,7 +267,8 @@ if __name__ == "__main__":
                         print(real_prob.shape)
             sys.exit()
 
-        iteration = (sample_size / cfg.batch_size) if cfg.epoch_size < sample_size / cfg.batch_size else cfg.iteration
+        # use the bigger one as iteration
+        iteration = (sample_size / cfg.batch_size) if cfg.iteration < sample_size / cfg.batch_size else cfg.iteration
         for epoch_step in range(cfg.epoch_size):
             epoch_loss = 0.0
             for iter in range(iteration):
@@ -272,9 +279,9 @@ if __name__ == "__main__":
                         train_writer.add_summary(merged, iter * epoch_step)
                     else:
                         iter_loss = dssm_obj.train(train_idx)
-                    print("epoch %d : iteration %d, loss is %f" % (epoch_step, iter, iter_loss))
                     epoch_loss += iter_loss
-            epoch_loss /= len(train_index_list)
+            epoch_loss /= train_list_len
+            print("epoch %d : loss is %f" % (epoch_step, epoch_loss))
             train_loss = dssm_obj.get_loss_summary(epoch_loss)
             train_writer.add_summary(train_loss, epoch_step + 1)
 
@@ -282,10 +289,9 @@ if __name__ == "__main__":
             for iter in range(iteration):
                 test_idx = iter % (sample_size / cfg.batch_size)
                 if np.isin(test_idx, train_index_list) == False:
-                    iter_accuracy = dssm_obj.validate(test_idx)
-                    print("epoch %d : iteration %d, accuracy is %f" % (epoch_step, iter, iter_accuracy))
-                    epoch_accuracy += iter_accuracy
-            epoch_accuracy /= (sample_size / cfg.batch_size - len(train_index_list))
+                    epoch_accuracy += dssm_obj.validate(test_idx)
+            epoch_accuracy /= test_list_len
+            print("epoch %d : accuracy is %f" % (epoch_step, epoch_accuracy))
             test_accuracy = dssm_obj.get_accuracy_summary(epoch_accuracy)
             test_writer.add_summary(test_accuracy, epoch_step + 1)
         dssm_obj.save()

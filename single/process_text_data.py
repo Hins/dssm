@@ -58,7 +58,7 @@ if __name__ == "__main__":
     print("calculate bigram count complete")
     '''
 
-    bigram_dict = {}
+    unigram_dict = {}
     user_indices = []
     doc_indices = []
     for line_index, line in enumerate(input_file):    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
@@ -70,6 +70,10 @@ if __name__ == "__main__":
         user_query_len = len(user_query_list)
         query_indice_list = []
         for index,word in enumerate(user_query_list):
+            if word not in unigram_dict:
+                unigram_dict[word] = len(unigram_dict) + 1
+            query_indice_list.append([line_index, unigram_dict[word]])
+            '''
             if index + 1 < user_query_len:
                 key = word + cfg.separator + user_query_list[index + 1]
                 #if bigram_count[key] > 5:
@@ -82,6 +86,7 @@ if __name__ == "__main__":
                 if key not in bigram_dict:
                     bigram_dict[key] = len(bigram_dict) + 1
                 query_indice_list.append([line_index, bigram_dict[key]])
+            '''
         if len(query_indice_list) == 0:
             continue
 
@@ -95,6 +100,10 @@ if __name__ == "__main__":
 
             tmp_doc_indice_list = []
             for index, word in enumerate(document):
+                if word not in unigram_dict:
+                    unigram_dict[word] = len(unigram_dict) + 1
+                tmp_doc_indice_list.append([line_index, doc_index, unigram_dict[word]])
+                '''
                 if index + 1 < document_len:
                     key = word + cfg.separator + document[index + 1]
                     #if trigram_count[key] > 5:
@@ -107,6 +116,7 @@ if __name__ == "__main__":
                     if key not in bigram_dict:
                         bigram_dict[key] = len(bigram_dict) + 1
                     tmp_doc_indice_list.append([line_index, doc_index, bigram_dict[key]])
+                '''
             if len(tmp_doc_indice_list) == 0:
                 flag = False
                 break
@@ -117,15 +127,15 @@ if __name__ == "__main__":
     input_file.close()
 
     output_file = open(cfg.dict_file_path, 'w')
-    for k,v in bigram_dict.items():
+    for k,v in unigram_dict.items():
         try:
             output_file.write(k.decode('utf-8') + "\t" + str(v) + "\n")
         except:
             output_file.write(k + "\t" + str(v) + "\n")
     output_file.close()
 
-    bigram_dict_size = len(bigram_dict) + 1
-    print("bigram_dict_size is %d" % bigram_dict_size)
+    unigram_dict_size = len(unigram_dict) + 1
+    print("bigram_dict_size is %d" % unigram_dict_size)
 
     user_indices_output_file = open(cfg.query_indices_path, 'w')
     for item in user_indices:

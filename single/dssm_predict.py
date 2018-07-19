@@ -14,7 +14,7 @@ from config import cfg
 float_digit_pattern = re.compile(r"-?([1-9]\d*\.\d*|0\.\d*[1-9]\d*|0?\.0+|0)$")
 integ_digit_pattern = re.compile(r"-?[1-9]\d*")
 
-def get_sparse_input(user_query, doc_list, bigram_dict):
+def get_user_sparse_input(user_query, bigram_dict):
     user_word_list = jieba.cut(user_query, cut_all=False)
     user_word_list = [item.encode('utf-8') for item in user_word_list if
                  item.encode('utf-8') not in stopword_dict and
@@ -29,15 +29,11 @@ def get_sparse_input(user_query, doc_list, bigram_dict):
     for index, word in enumerate(user_word_list):
         if index + 1 < user_word_len:
             key = word + cfg.separator + user_word_list[index + 1]
-            if key not in bigram_dict:
-                bigram_dict[key] = len(bigram_dict) + 1
-            query_indice_list.append([0, bigram_dict[key]])
         else:
             key = word + cfg.separator + cfg.placeholder
-            if key not in bigram_dict:
-                bigram_dict[key] = len(bigram_dict) + 1
+        if key in bigram_dict:
             query_indice_list.append([0, bigram_dict[key]])
-        query_value_list.append(1)
+            query_value_list.append(1)
     if len(query_indice_list) == 0:
         return -1
     return query_indice_list, query_value_list
@@ -92,8 +88,6 @@ if __name__ == "__main__":
             dssm_model = tf.train.import_meta_graph(sys.argv[1] + '.meta')
             dssm_model.restore(sess, sys.argv[1])
             graph = tf.get_default_graph()
-            for n in tf.get_default_graph().as_graph_def().node:
-                print("tensor is %s" % n.name)
 
             prob = graph.get_tensor_by_name("Loss/prob:0")
             query_batch_indices = graph.get_tensor_by_name("input/QueryBatch/indices:0")
@@ -103,7 +97,7 @@ if __name__ == "__main__":
             doc_batch_values = graph.get_tensor_by_name("input/DocBatch/values:0")
             doc_batch_shape = graph.get_tensor_by_name("input/DocBatch/shape:0")
             for index,query in enumerate(user_query_list):
-                rtv = get_sparse_input(query, docs_list[index], bigram_dict)
+                rtv = get_user_sparse_input(query, bigram_dict)
                 if rtv == -1:
                     print("get_sparse_input fail")
                     sys.exit()
@@ -131,20 +125,13 @@ if __name__ == "__main__":
                         for index, word in enumerate(doc_word_list):
                             if index + 1 < doc_word_len:
                                 key = word + cfg.separator + doc_word_list[index + 1]
-                                if key not in bigram_dict:
-                                    bigram_dict[key] = len(bigram_dict) + 1
-                                doc_indice_list.append([0, doc_index, bigram_dict[key]])
-                                print("%d:%d" % (doc_index, bigram_dict[key]))
                             else:
                                 key = word + cfg.separator + cfg.placeholder
-                                if key not in bigram_dict:
-                                    bigram_dict[key] = len(bigram_dict) + 1
+                            if key in bigram_dict:
                                 doc_indice_list.append([0, doc_index, bigram_dict[key]])
-                                print("%d:%d" % (doc_index, bigram_dict[key]))
-                            doc_value_list.append(1)
+                                doc_value_list.append(1.0)
                     real_prob = sess.run(prob, feed_dict={query_batch_indices: query_batch_indices_indices, query_batch_values: query_batch_indices_value, query_batch_shape: query_in_shape,
                                                       doc_batch_indices: doc_indice_list, doc_batch_values: doc_value_list, doc_batch_shape: doc_in_shape})
-                    print(real_prob.shape)
                     print(real_prob[0])
-                    # print(np.argmax(real_prob, axis=1))
+                    print(np.argmax(real_prob[0], axis=0))
             sys.exit()
