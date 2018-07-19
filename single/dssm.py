@@ -204,6 +204,7 @@ if __name__ == "__main__":
             words_dict[elements[0]] = int(elements[1])
         input_file.close()
     bigram_dict_size = len(words_dict)
+    print("bigram_dict_size length is %d" % bigram_dict_size)
 
     user_indices = []
     with open(cfg.query_indices_path, 'r') as input_file:
