@@ -271,6 +271,7 @@ if __name__ == "__main__":
     #if not cfg.gpu:
     #config = tf.ConfigProto(device_count= {'GPU' : 0})
 
+    iteration = (sample_size / cfg.batch_size) if cfg.iteration < sample_size / cfg.batch_size else cfg.iteration
     with tf.Session(config=config) as sess:
         #sess.run(tf.global_variables_initializer())
         dssm_obj = DSSM(sess, bigram_dict_size, cfg.dssm_model_path)
@@ -293,21 +294,20 @@ if __name__ == "__main__":
 
         # use the bigger one as iteration
         trainable = False
-        iteration = (sample_size / cfg.batch_size) if cfg.iteration < sample_size / cfg.batch_size else cfg.iteration
         for epoch_step in range(cfg.epoch_size):
             epoch_loss = 0.0
             for iter in range(iteration):
                 train_idx = iter % (sample_size / cfg.batch_size)
-                if np.isin(train_idx, train_index_list) == True:
-                    if trainable == True:
-                        tf.get_variable_scope().reuse_variables()
-                    trainable = True
-                    if iter % 100 == 0:
-                        _, merged, iter_loss = dssm_obj.train(train_idx, True)
-                        train_writer.add_summary(merged, iter * epoch_step)
-                    else:
-                        iter_loss = dssm_obj.train(train_idx)
-                    epoch_loss += iter_loss
+                # if np.isin(train_idx, train_index_list) == True:
+                if trainable == True:
+                    tf.get_variable_scope().reuse_variables()
+                trainable = True
+                if iter % 100 == 0:
+                    _, merged, iter_loss = dssm_obj.train(train_idx, True)
+                    train_writer.add_summary(merged, iter * epoch_step)
+                else:
+                    iter_loss = dssm_obj.train(train_idx)
+                epoch_loss += iter_loss
             epoch_loss /= train_list_len
             print("epoch %d : loss is %f" % (epoch_step, epoch_loss))
             train_loss = dssm_obj.get_loss_summary(epoch_loss)
