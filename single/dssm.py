@@ -24,13 +24,14 @@ class DSSM:
                 self.doc_batch = tf.sparse_placeholder(tf.float32, shape=[None, cfg.negative_size, self.dict_size], name='DocBatch')
                 print("doc_batch shape is %s" % self.doc_batch.get_shape())    # [1000, 20, BIGRAM_D]
 
-        with tf.name_scope('L1'):
+        with tf.variable_scope('L1', reuse=True):
             l1_par_range = np.sqrt(6.0 / (self.dict_size + cfg.l1_norm))
             weight1 = tf.Variable(tf.random_uniform([self.dict_size, cfg.l1_norm], -l1_par_range, l1_par_range))
             bias1 = tf.Variable(tf.random_uniform([cfg.l1_norm], -l1_par_range, l1_par_range))
             self.variable_summaries(weight1, 'L1_weights')
             self.variable_summaries(bias1, 'L1_biases')
 
+        with tf.name_scope('L1_op'):
             # query_l1 = tf.matmul(tf.to_float(query_batch),weight1)+bias1
             query_l1 = tf.sparse_tensor_dense_matmul(self.query_batch, weight1) + bias1
             # doc_l1 = tf.matmul(tf.to_float(doc_batch),weight1)+bias1
@@ -47,13 +48,14 @@ class DSSM:
             doc_l1_out = tf.nn.relu(doc_l1)
             print("doc_l1_out shape is %s" % doc_l1_out.get_shape())    # [1000, 20, 400]
 
-        with tf.name_scope('L2'):
+        with tf.variable_scope('L2', reuse=True):
             l2_par_range = np.sqrt(6.0 / (cfg.l1_norm + cfg.l2_norm))
             weight2 = tf.Variable(tf.random_uniform([cfg.l1_norm, cfg.l2_norm], -l2_par_range, l2_par_range))
             bias2 = tf.Variable(tf.random_uniform([cfg.l2_norm], -l2_par_range, l2_par_range))
             self.variable_summaries(weight2, 'L2_weights')
             self.variable_summaries(bias2, 'L2_biases')
 
+        with tf.name_scope('L2_op')
             query_l2 = tf.matmul(query_l1_out, weight2) + bias2
             print("query_l2 shape is %s" % query_l2.get_shape())    # [1000, 120]
 
@@ -95,7 +97,6 @@ class DSSM:
             print("prob shape is %s" % self.prob.get_shape())
             pos_prob = tf.slice(self.prob, [0, 0], [-1, 1])    # [1000, 1]
             print("pos_prob shape is %s" % pos_prob.get_shape())
-            print("tf.slice(self.prob, [0, 1], [-1, cfg.negative_size - 1]) shape is %s" % tf.slice(self.prob, [0, 1], [-1, cfg.negative_size - 1]).get_shape())
             neg_prob = tf.reduce_sum(tf.slice(self.prob, [0, 1], [-1, cfg.negative_size - 1]), axis=1)    # [1000, 60]
             print("neg_prob shape is %s" % neg_prob.get_shape())
             self.loss = (-tf.reduce_sum(tf.log(pos_prob)) + tf.reduce_sum(tf.log(neg_prob))) / cfg.batch_size
