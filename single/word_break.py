@@ -7,9 +7,11 @@ import jieba
 import sys
 import re
 
+from config import cfg
+
 if __name__ == "__main__":
-    if len(sys.argv) < 5:
-        print("word_break <self-defined dictionary> <stopword file> <input file> <output file>")
+    if len(sys.argv) < 3:
+        print("word_break <self-defined dictionary> <stopword file>")
         sys.exit()
 
     jieba.load_userdict(sys.argv[1])
@@ -25,8 +27,8 @@ if __name__ == "__main__":
     float_digit_pattern = re.compile(r"-?([1-9]\d*\.\d*|0\.\d*[1-9]\d*|0?\.0+|0)$")
     integ_digit_pattern = re.compile(r"-?[1-9]\d*")
 
-    with open(sys.argv[4], 'w') as output_file:
-        with open(sys.argv[3], 'r') as input_file:
+    with open(cfg.wb_file_path, 'w') as output_file:
+        with open(cfg.raw_text_file, 'r') as input_file:
             for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
                 elements = line.replace('\r','').replace('\n', '').split('\001')
                 if len(elements) < 2:

@@ -1,4 +1,3 @@
-import random
 import time
 import os
 import sys
@@ -26,8 +25,20 @@ class DSSM:
 
         with tf.variable_scope('L1', reuse=True):
             l1_par_range = np.sqrt(6.0 / (self.dict_size + cfg.l1_norm))
-            weight1 = tf.Variable(tf.random_uniform([self.dict_size, cfg.l1_norm], -l1_par_range, l1_par_range))
-            bias1 = tf.Variable(tf.random_uniform([cfg.l1_norm], -l1_par_range, l1_par_range))
+            weight1 = tf.get_variable(
+                'L1_weights',
+                shape=[self.dict_size, cfg.l1_norm],
+                initializer=tf.random_uniform([self.dict_size, cfg.l1_norm], -l1_par_range, l1_par_range),
+                dtype='float64'
+            )
+            # weight1 = tf.Variable(tf.random_uniform([self.dict_size, cfg.l1_norm], -l1_par_range, l1_par_range))
+            bias1 = tf.get_variable(
+                'L1_biases',
+                shape=[cfg.l1_norm],
+                initializer=tf.random_uniform([cfg.l1_norm], -l1_par_range, l1_par_range),
+                dtype='float64'
+            )
+            # bias1 = tf.Variable(tf.random_uniform([cfg.l1_norm], -l1_par_range, l1_par_range))
             self.variable_summaries(weight1, 'L1_weights')
             self.variable_summaries(bias1, 'L1_biases')
 
@@ -50,12 +61,24 @@ class DSSM:
 
         with tf.variable_scope('L2', reuse=True):
             l2_par_range = np.sqrt(6.0 / (cfg.l1_norm + cfg.l2_norm))
-            weight2 = tf.Variable(tf.random_uniform([cfg.l1_norm, cfg.l2_norm], -l2_par_range, l2_par_range))
-            bias2 = tf.Variable(tf.random_uniform([cfg.l2_norm], -l2_par_range, l2_par_range))
+            weight2 = tf.get_variable(
+                'L2_weights',
+                shape=[cfg.l1_norm, cfg.l2_norm],
+                initializer=tf.random_uniform([cfg.l1_norm, cfg.l2_norm], -l2_par_range, l2_par_range),
+                dtype='float64'
+            )
+            # weight2 = tf.Variable(tf.random_uniform([cfg.l1_norm, cfg.l2_norm], -l2_par_range, l2_par_range))
+            bias2 = tf.get_variable(
+                'L2_biases',
+                shape=[cfg.l2_norm],
+                initializer=tf.random_uniform([cfg.l2_norm], -l2_par_range, l2_par_range),
+                dtype='float64'
+            )
+            # bias2 = tf.Variable(tf.random_uniform([cfg.l2_norm], -l2_par_range, l2_par_range))
             self.variable_summaries(weight2, 'L2_weights')
             self.variable_summaries(bias2, 'L2_biases')
 
-        with tf.name_scope('L2_op')
+        with tf.name_scope('L2_op'):
             query_l2 = tf.matmul(query_l1_out, weight2) + bias2
             print("query_l2 shape is %s" % query_l2.get_shape())    # [1000, 120]
 
@@ -269,12 +292,16 @@ if __name__ == "__main__":
             sys.exit()
 
         # use the bigger one as iteration
+        trainable = False
         iteration = (sample_size / cfg.batch_size) if cfg.iteration < sample_size / cfg.batch_size else cfg.iteration
         for epoch_step in range(cfg.epoch_size):
             epoch_loss = 0.0
             for iter in range(iteration):
                 train_idx = iter % (sample_size / cfg.batch_size)
                 if np.isin(train_idx, train_index_list) == True:
+                    if trainable == True:
+                        tf.get_variable_scope().reuse_variables()
+                    trainable = True
                     if iter % 100 == 0:
                         _, merged, iter_loss = dssm_obj.train(train_idx, True)
                         train_writer.add_summary(merged, iter * epoch_step)
