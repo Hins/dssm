@@ -27,6 +27,10 @@ def get_user_sparse_input(user_query, bigram_dict):
     query_indice_list = []    # [[0,1], [0,3], [0,6]]
     query_value_list = []
     for index, word in enumerate(user_word_list):
+        if word in bigram_dict:
+            query_indice_list.append([0, bigram_dict[word]])
+            query_value_list.append(1)
+        '''
         if index + 1 < user_word_len:
             key = word + cfg.separator + user_word_list[index + 1]
         else:
@@ -34,6 +38,7 @@ def get_user_sparse_input(user_query, bigram_dict):
         if key in bigram_dict:
             query_indice_list.append([0, bigram_dict[key]])
             query_value_list.append(1)
+        '''
     if len(query_indice_list) == 0:
         return -1
     return query_indice_list, query_value_list
@@ -123,6 +128,10 @@ if __name__ == "__main__":
                                          integ_digit_pattern.match(item.encode("utf-8")) == None]
                         doc_word_len = len(doc_word_list)
                         for index, word in enumerate(doc_word_list):
+                            if word in bigram_dict:
+                                doc_indice_list.append([0, doc_index, bigram_dict[word]])
+                                doc_value_list.append(1)
+                            '''
                             if index + 1 < doc_word_len:
                                 key = word + cfg.separator + doc_word_list[index + 1]
                             else:
@@ -130,6 +139,7 @@ if __name__ == "__main__":
                             if key in bigram_dict:
                                 doc_indice_list.append([0, doc_index, bigram_dict[key]])
                                 doc_value_list.append(1.0)
+                            '''
                     real_prob = sess.run(prob, feed_dict={query_batch_indices: query_batch_indices_indices, query_batch_values: query_batch_indices_value, query_batch_shape: query_in_shape,
                                                       doc_batch_indices: doc_indice_list, doc_batch_values: doc_value_list, doc_batch_shape: doc_in_shape})
                     print(real_prob[0])
