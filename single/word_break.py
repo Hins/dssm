@@ -30,7 +30,7 @@ if __name__ == "__main__":
     with open(cfg.wb_file_path, 'w') as output_file:
         with open(cfg.raw_text_file, 'r') as input_file:
             for line in input_file:    # <user_query>\001<document1>\t<label1>\002<document2>\t<label2>
-                elements = line.replace('\r','').replace('\n', '').split('\001')
+                elements = line.replace('\r','').replace('\n', '').lower().split('\001')
                 if len(elements) < 2:
                     continue
                 query = elements[0]
