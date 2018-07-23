@@ -80,38 +80,38 @@ class DSSM:
 
         with tf.name_scope('L2_op'):
             query_l2 = tf.matmul(query_l1_out, weight2) + bias2
-            print("query_l2 shape is %s" % query_l2.get_shape())    # [1000, 120]
+            print("query_l2 shape is %s" % query_l2.get_shape())    # [batch_size, l2_norm]
 
             doc_batches = tf.split(value=doc_l1_out, num_or_size_splits=cfg.negative_size, axis=1)
             doc_l2_batch = []
             for doc in doc_batches:
                 doc_l2_batch.append(tf.matmul(tf.squeeze(doc), weight2) + bias2)
             doc_l2 = tf.reshape(tf.convert_to_tensor(doc_l2_batch), shape=[cfg.batch_size, cfg.negative_size, -1])
-            print("doc_l2 shape is %s" % doc_l2.get_shape()[2])    # [1000, 20, 120]
-            query_y = tf.nn.relu(query_l2)
-            print("query_y shape is %s" % query_y.get_shape())    # [1000, 120]
-            doc_y = tf.nn.relu(doc_l2)
-            print("doc_y shape is %s" % doc_y.get_shape())    # [1000, 20, 120]
+            print("doc_l2 shape is %s" % doc_l2.get_shape()[2])    # [batch_size, negative_size, l2_norm]
+            query_y = tf.nn.tanh(query_l2)
+            print("query_y shape is %s" % query_y.get_shape())    # [batch_size, l2_norm]
+            doc_y = tf.nn.tanh(doc_l2)
+            print("doc_y shape is %s" % doc_y.get_shape())    # [batch_size, negative_size, l2_norm]
 
         with tf.name_scope('Cosine_Similarity'):
             # Cosine similarity
-            query_y_tile = tf.tile(query_y, [1, cfg.negative_size])    # [1000, 2400], 2400 = 20 * 120
+            query_y_tile = tf.tile(query_y, [1, cfg.negative_size])    # [batch_size, negative_size * l2_norm], 2400 = 20 * 120
             print("query_y_tile shape is %s" % query_y_tile.get_shape())
-            doc_y_concat = tf.reshape(doc_y, shape=[cfg.batch_size, -1])    # [1000, 2400]
+            doc_y_concat = tf.reshape(doc_y, shape=[cfg.batch_size, -1])    # [batch_size, negative_size * l2_norm]
             print("doc_y_concat shape is %s" % doc_y_concat.get_shape())
-            query_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True)), [1, cfg.negative_size])    # [1000, 20]
+            query_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(query_y), 1, True)), [1, cfg.negative_size])    # [batch_size, negative_size]
             print("query_norm shape is %s" % query_norm.get_shape())
-            doc_norm = tf.squeeze(tf.sqrt(tf.reduce_sum(tf.square(doc_y), 2, True)))    # [1000, 20]
+            doc_norm = tf.squeeze(tf.sqrt(tf.reduce_sum(tf.square(doc_y), 2, True)))    # [batch_size, negative_size]
             print("doc_norm shape is %s" % doc_norm.get_shape())
             print("tf.multiply(query_y_tile, doc_y_concat) shape is %s" % tf.multiply(query_y_tile, doc_y_concat).get_shape())
-            prod = tf.reduce_sum(tf.reshape(tf.multiply(query_y_tile, doc_y_concat), shape=[cfg.batch_size, cfg.negative_size, -1]), 2)    # [1000, 20]
+            prod = tf.reduce_sum(tf.reshape(tf.multiply(query_y_tile, doc_y_concat), shape=[cfg.batch_size, cfg.negative_size, -1]), 2)    # [batch_size, negative_size]
             print("prod shape is %s" % prod.get_shape())
-            norm_prod = tf.multiply(query_norm, doc_norm)    # [1000, 20]
+            norm_prod = tf.multiply(query_norm, doc_norm)    # [batch_size, negative_size]
             print("norm_prod shape is %s" % norm_prod.get_shape())
 
-            cos_sim_raw = tf.truediv(prod, norm_prod)    # [1000, 20]
+            cos_sim_raw = tf.truediv(prod, norm_prod)    # [batch_size, negative_size]
             print("cos_sim_raw shape is %s" % cos_sim_raw.get_shape())
-            cos_sim = tf.transpose(tf.reshape(tf.transpose(cos_sim_raw), [cfg.negative_size, cfg.batch_size])) * 20    # 20 is \gamma, [1000, 20]
+            cos_sim = tf.transpose(tf.reshape(tf.transpose(cos_sim_raw), [cfg.negative_size, cfg.batch_size])) * 1    # 1 is \gamma, [batch_size, negative_size]
             print("cos_sim shape is %s" % cos_sim.get_shape())
 
         with tf.name_scope('Loss'):
