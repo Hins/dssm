@@ -54,9 +54,9 @@ class DSSM:
             print("doc_l1 shape is %s" % doc_l1.get_shape())
             # tf.convert_to_tensor_or_sparse_tensor(tf.squeeze(doc_l1_batch, axis=0))
 
-            query_l1_out = tf.nn.relu(query_l1)
+            query_l1_out = tf.nn.tanh(query_l1)
             print("query_l1_out shape is %s" % query_l1_out.get_shape())    # [1000, 400]
-            doc_l1_out = tf.nn.relu(doc_l1)
+            doc_l1_out = tf.nn.tanh(doc_l1)
             print("doc_l1_out shape is %s" % doc_l1_out.get_shape())    # [1000, 20, 400]
 
         with tf.variable_scope('L2'):
@@ -122,7 +122,10 @@ class DSSM:
             print("pos_prob shape is %s" % pos_prob.get_shape())
             neg_prob = tf.reduce_sum(tf.slice(self.prob, [0, 1], [-1, cfg.negative_size - 1]), axis=1)    # [1000, 60]
             print("neg_prob shape is %s" % neg_prob.get_shape())
-            self.loss = (-tf.reduce_sum(tf.log(pos_prob)) + tf.reduce_sum(tf.log(neg_prob))) / cfg.batch_size
+            if cfg.use_neg_score == True:
+                self.loss = (-tf.reduce_sum(tf.log(pos_prob)) + tf.reduce_sum(tf.log(neg_prob))) / cfg.batch_size
+            else:
+                self.loss = -tf.reduce_sum(tf.log(pos_prob)) / cfg.batch_size
 
         with tf.name_scope('Training'):
             # Optimizer

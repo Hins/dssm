@@ -18,6 +18,7 @@ flags.DEFINE_integer('l1_norm', 400, 'l1 normalization')
 flags.DEFINE_integer('l2_norm', 120, 'l2 normalization')
 flags.DEFINE_string('separator', '###', 'separator')
 flags.DEFINE_string('placeholder', 'none_xtpan', 'placeholder')
+flags.DEFINE_boolean('use_neg_score', False, 'use negative sample score')
 flags.DEFINE_bool('gpu', 1, "Enable GPU or not")
 
 flags.DEFINE_string('summaries_dir', '../data/dssm-400-120-relu', 'Summaries directory')
