@@ -23,24 +23,25 @@ class DSSM:
                 self.doc_batch = tf.sparse_placeholder(tf.float32, shape=[None, cfg.negative_size, self.dict_size], name='DocBatch')
                 print("doc_batch shape is %s" % self.doc_batch.get_shape())    # [1000, 20, BIGRAM_D]
 
-        with tf.variable_scope('L1'):
-            l1_par_range = np.sqrt(6.0 / (self.dict_size + cfg.l1_norm))
-            weight1 = tf.get_variable(
-                'L1_weights',
-                shape=[self.dict_size, cfg.l1_norm],
-                initializer=tf.random_uniform_initializer(minval=-l1_par_range, maxval=l1_par_range),
-                dtype='float32'
-            )
-            # weight1 = tf.Variable(tf.random_uniform([self.dict_size, cfg.l1_norm], -l1_par_range, l1_par_range))
-            bias1 = tf.get_variable(
-                'L1_biases',
-                shape=[cfg.l1_norm],
-                initializer=tf.random_uniform_initializer(minval=-l1_par_range, maxval=l1_par_range),
-                dtype='float32'
-            )
-            # bias1 = tf.Variable(tf.random_uniform([cfg.l1_norm], -l1_par_range, l1_par_range))
-            self.variable_summaries(weight1, 'L1_weights')
-            self.variable_summaries(bias1, 'L1_biases')
+        with tf.device('/gpu:0'):
+            with tf.variable_scope('L1'):
+                l1_par_range = np.sqrt(6.0 / (self.dict_size + cfg.l1_norm))
+                weight1 = tf.get_variable(
+                    'L1_weights',
+                    shape=[self.dict_size, cfg.l1_norm],
+                    initializer=tf.random_uniform_initializer(minval=-l1_par_range, maxval=l1_par_range),
+                    dtype='float32'
+                )
+                # weight1 = tf.Variable(tf.random_uniform([self.dict_size, cfg.l1_norm], -l1_par_range, l1_par_range))
+                bias1 = tf.get_variable(
+                    'L1_biases',
+                    shape=[cfg.l1_norm],
+                    initializer=tf.random_uniform_initializer(minval=-l1_par_range, maxval=l1_par_range),
+                    dtype='float32'
+                )
+                # bias1 = tf.Variable(tf.random_uniform([cfg.l1_norm], -l1_par_range, l1_par_range))
+                self.variable_summaries(weight1, 'L1_weights')
+                self.variable_summaries(bias1, 'L1_biases')
 
         with tf.name_scope('L1_op'):
             # query_l1 = tf.matmul(tf.to_float(query_batch),weight1)+bias1
@@ -59,24 +60,25 @@ class DSSM:
             doc_l1_out = tf.nn.tanh(doc_l1)
             print("doc_l1_out shape is %s" % doc_l1_out.get_shape())    # [1000, 20, 400]
 
-        with tf.variable_scope('L2'):
-            l2_par_range = np.sqrt(6.0 / (cfg.l1_norm + cfg.l2_norm))
-            weight2 = tf.get_variable(
-                'L2_weights',
-                shape=[cfg.l1_norm, cfg.l2_norm],
-                initializer=tf.random_uniform_initializer(minval=-l2_par_range, maxval=l2_par_range),
-                dtype='float32'
-            )
-            # weight2 = tf.Variable(tf.random_uniform([cfg.l1_norm, cfg.l2_norm], -l2_par_range, l2_par_range))
-            bias2 = tf.get_variable(
-                'L2_biases',
-                shape=[cfg.l2_norm],
-                initializer=tf.random_uniform_initializer(minval=-l2_par_range, maxval=l2_par_range),
-                dtype='float32'
-            )
-            # bias2 = tf.Variable(tf.random_uniform([cfg.l2_norm], -l2_par_range, l2_par_range))
-            self.variable_summaries(weight2, 'L2_weights')
-            self.variable_summaries(bias2, 'L2_biases')
+        with tf.device('/gpu:0'):
+            with tf.variable_scope('L2'):
+                l2_par_range = np.sqrt(6.0 / (cfg.l1_norm + cfg.l2_norm))
+                weight2 = tf.get_variable(
+                    'L2_weights',
+                    shape=[cfg.l1_norm, cfg.l2_norm],
+                    initializer=tf.random_uniform_initializer(minval=-l2_par_range, maxval=l2_par_range),
+                    dtype='float32'
+                )
+                # weight2 = tf.Variable(tf.random_uniform([cfg.l1_norm, cfg.l2_norm], -l2_par_range, l2_par_range))
+                bias2 = tf.get_variable(
+                    'L2_biases',
+                    shape=[cfg.l2_norm],
+                    initializer=tf.random_uniform_initializer(minval=-l2_par_range, maxval=l2_par_range),
+                    dtype='float32'
+                )
+                # bias2 = tf.Variable(tf.random_uniform([cfg.l2_norm], -l2_par_range, l2_par_range))
+                self.variable_summaries(weight2, 'L2_weights')
+                self.variable_summaries(bias2, 'L2_biases')
 
         with tf.name_scope('L2_op'):
             query_l2 = tf.matmul(query_l1_out, weight2) + bias2
